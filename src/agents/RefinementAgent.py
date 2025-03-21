@@ -1,4 +1,6 @@
+import json
 from typing import Type
+from langchain_anthropic import ChatAnthropic
 from langchain_deepseek import ChatDeepSeek
 from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage
@@ -68,9 +70,25 @@ def tool_schema_description(tool_cls: Type[BaseModel]) -> str:
 {field_descriptions}
 """
 
+def cache_refinement(fn):
+    cache = {}
+    async def wrapper(self, client_prompt):
+        nonlocal cache
+        with open("cache.json", "r") as f:
+            cache = json.load(f)
+
+        if client_prompt in cache:
+            return cache[client_prompt]
+        result = await fn(self, client_prompt)
+        cache[client_prompt] = result
+        with open("cache.json", "w") as f:
+            json.dump(cache, f)
+        return result
+    return wrapper
 class RefinementAgent:
     def __init__(self):
-        self.llm = ChatOllama(model="mistral", temperature=0)
+        #self.llm = ChatAnthropic(model="claude-3-5-haiku-latest", temperature=0)
+        self.llm = ChatOllama(model="gemma:2b", temperature=0)
         background = load_readme()
         tool_info = "\n".join(tool_schema_description(tool) for tool in create_tools())
         self.partial_prompt = refinement_prompt.format(
@@ -84,9 +102,11 @@ class RefinementAgent:
             return await llm.ainvoke([HumanMessage(client_prompt)])
         return await self.llm.ainvoke(client_prompt)
 
+    @cache_refinement
     async def refine_prompt(self, client_prompt) -> str:
         # Get a response from the LLM
         prompt = self.partial_prompt.format(PLAYER_PROMPT=client_prompt)
 
         response = await self.llm.ainvoke(prompt)
         return response.content
+    

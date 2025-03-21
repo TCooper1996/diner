@@ -10,7 +10,7 @@ Each action is contained in its own module and manages all aspects of that actio
 from typing import Dict, Literal, Union
 from src.actions.base import ActionResult
 from src.actions.move import *
-from src.actions.pick_up_order import PickUpOrder
+from src.actions.pick_up_order import *
 from src.actions.seat import *
 from src.actions.take_order import *
 from src.actions.notify_kitchen import *
@@ -35,7 +35,8 @@ EmployeeAction = Union[
     SubmitOrdersToKitchen,
     CookAction,
     HandOrderToCustomer,
-    WaitAction
+    WaitAction,
+    PickUpOrder
 ]
 
 tools = {

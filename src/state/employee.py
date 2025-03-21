@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from langchain_core.messages import BaseMessage
 
 
+from src.agents.models.Model import StandardMessage
 from src.game_engine.location import ENTRANCE
 
 
@@ -12,7 +13,7 @@ class Employee(BaseModel):
     name: str
     instruction: str
     location: str = Field(default=ENTRANCE)
-    messages: List[Any] = Field(default_factory=list)  # Conversation history that persists between ticks
+    messages: List[StandardMessage] = Field(default_factory=list)  # Conversation history that persists between ticks
     action: Any = Field(default_factory=any)  # The action the employee is currently performing (typed as Any to avoid circular import)
     recentThoughts: List[BaseMessage] = Field(default_factory=list)  # Recent thoughts for the employee
     
@@ -39,10 +40,8 @@ Employee: {self.name}
 
     def last_decision_text(self) -> str:
         """Get the most recent decision """
-        invocation = self.messages[-2]
-        return invocation.content[0]["text"]
+        return self.messages[-3].content
 
     def last_decision_result(self) -> str:
         """Get the most recent decision result"""
-        invocation = self.messages[-1]
-        return invocation.content
+        return self.messages[-1].tool_output

@@ -18,5 +18,8 @@ class ActionResult(BaseModel):
     Result of an action, including success status, message, and updated game state
     """
     success: bool
-    message:str 
-    game_state:GameState
+    message: str
+    game_state: GameState
+
+    def __init__(self, success: bool, message: str, game_state: GameState):
+        super().__init__(success=success, message=message, game_state=game_state)

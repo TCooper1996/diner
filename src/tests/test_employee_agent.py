@@ -45,7 +45,7 @@ class TestEmployeeAgent(unittest.TestCase):
         result, updated_state = await self.agent_controller.process(self.game_state, host.name)
         
         # Check that the host tried to seat the customer
-        self.assertEqual(SeatAction(), result)
+        self.assertEqual(SeatAction(), result.action)
         
         # Verify customer was moved to dining area
         self.assertEqual(updated_state.customers[customer.id].location, DINING)
@@ -88,7 +88,7 @@ class TestEmployeeAgent(unittest.TestCase):
         result, updated_state = await self.agent_controller.process(self.game_state, waiter.name)
         
         # Check that the waiter took the customer's order
-        self.assertEqual(TakeOrderAction(), result)
+        self.assertEqual(TakeOrderAction(), result.action)
         
         # Verify customer status was updated
         self.assertEqual(updated_state.customers[customer.id].status, "ordered")
@@ -115,7 +115,7 @@ class TestEmployeeAgent(unittest.TestCase):
         result, updated_state = await self.agent_controller.process(self.game_state, waiter.name)
         
         # Check that the waiter moved to the dining area
-        self.assertEqual(MoveToNewRoom(destination=DINING), result)
+        self.assertEqual(MoveToNewRoom(destination=DINING), result.action)
         self.assertEqual(updated_state.employees[waiter.name].location, DINING)
         
         
@@ -141,7 +141,7 @@ class TestEmployeeAgent(unittest.TestCase):
         result, updated_state = await self.agent_controller.process(self.game_state, cook.name)
         
         # Check that the cook prepared the food - actual order_id will be generated dynamically
-        self.assertEqual(result, CookAction(order_id=order.id))
+        self.assertEqual(result.action, CookAction(order_id=order.id))
         
         # Verify order status was updated
         self.assertEqual(updated_state.orders[order.id].status, OrderStatus.READY)
@@ -171,31 +171,31 @@ class TestEmployeeAgent(unittest.TestCase):
         
         # First turn: host should seat the customer
         result1, state1 = await self.agent_controller.process(self.game_state, host.name)
-        self.assertEqual(SeatAction(), result1)
+        self.assertEqual(SeatAction(), result1.action)
         
         # Second turn: waiter should take the customer's order
         result2, state2 = await self.agent_controller.process(state1, waiter.name)
-        self.assertEqual(TakeOrderAction(), result2)
+        self.assertEqual(TakeOrderAction(), result2.action)
 
         # Third turn: waiter should move to the kitchen
         result3, state3 = await self.agent_controller.process(state2, waiter.name)
-        self.assertEqual(MoveToNewRoom(destination=KITCHEN), result3)
+        self.assertEqual(MoveToNewRoom(destination=KITCHEN), result3.action)
 
         # Fourth turn: waiter should notify the kitchen of the order
         result4, state4 = await self.agent_controller.process(state3, waiter.name)
-        self.assertEqual(SubmitOrdersToKitchen(), result4)
+        self.assertEqual(SubmitOrdersToKitchen(), result4.action)
 
         # Fifth turn: cook should prepare the food
         result5, state5 = await self.agent_controller.process(state4, cook.name)
-        self.assertIsInstance(result5, CookAction)
+        self.assertIsInstance(result5.action, CookAction)
 
         # Sixth turn: cook should move to the dining area
         result6, state6 = await self.agent_controller.process(state5, cook.name)
-        self.assertEqual(MoveToNewRoom(destination=DINING), result6)
+        self.assertEqual(MoveToNewRoom(destination=DINING), result6.action)
 
         # Seventh turn: cook should deliver the food
         result7, state7 = await self.agent_controller.process(state6, cook.name)
-        self.assertEqual(HandOrderToCustomer(), result7)
+        self.assertEqual(HandOrderToCustomer(), result7.action)
         self.assertEqual(state7.customers[customer1.id].status, "eating")
         # There should be no more orders
         self.assertEqual(len(state7.orders), 0)

@@ -8,15 +8,15 @@ from pydantic import BaseModel, Field
 
 class OrderStatus(Enum):
     # Not yet taken to the kitchen
-    PENDING = "pending"
+    PENDING = "PENDING: Has been taken by a server but not yet submitted to the kitchen"
     # At the kitchen but not started cooking
-    TAKEN = "taken"
+    SUBMITTED = "SUBMITTED: Has been taken to the kitchen but not yet started cooking"
     # Currently being cooked
-    COOKING = "cooking"
+    COOKING = "COOKING: Is currently being cooked"
     # Ready to be delivered
-    READY = "ready"
+    READY = "READY: Is ready to be delivered"
     # Delivered to the customer
-    DELIVERED = "delivered"
+    DELIVERED = "DELIVERED: delivered"
 
 OrderItem = Literal["burger", "fries", "salad", "pizza", "soda"]
 
@@ -31,5 +31,9 @@ class Order(BaseModel):
     id: str = Field(default_factory=lambda: getId())
     items: List[OrderItem]
     status: OrderStatus = Field(default=OrderStatus.PENDING)
-    # The server that owns the order and must deliver it to the kitchen
-    server: str 
+
+    def to_prompt(self) -> str:
+        return f"""
+Order ID: {self.id}
+    Status: {self.status.value}
+"""

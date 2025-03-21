@@ -1,156 +1,188 @@
+from dataclasses import dataclass
 import time
-from typing import Dict, List, Annotated, TypedDict, Callable, Any, Optional, Tuple
+from typing import Coroutine, Dict, List, Annotated, TypedDict, Callable, Any, Optional, Tuple
 import os
 import json
 
 from dotenv import load_dotenv
-from langchain import hub
-from langchain.prompts import PromptTemplate, MessagesPlaceholder
+from langchain_ollama import ChatOllama
 from langchain_anthropic import ChatAnthropic
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
-from langchain.agents import create_openai_tools_agent, AgentExecutor
-from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
-from langchain_core.agents import AgentAction, AgentFinish
-import langgraph.graph as lg
-from pydantic import BaseModel, Field
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, BaseMessage, SystemMessage
 
+from src.agents.observe import observe_environment
 from src.state.employee import Employee
 from src.state.game import GameState
 from src.game_engine.location import Location
-from src.tools.restaurant_tools import (
-    ActionResult,
-    move_to_location,
-    notify_kitchen_of_orders,
-    seat_customer,
-    take_order,
-    cook_food,
-    deliver_food,
-    observe_environment
-)
+from src.state.types import AgentDecision, EmployeeTurn
 from src.utils.env import get_anthropic_api_key
-from src.agents.employee_tools import *
+
+# Import actions from the new actions package
+from src.actions import *
+
+planning_template = """
+You are {name}, an employee at a diner. Your instructions are: '{instruction}'
+
+Only perform duties relevant to your instructions.
 
 
-# State that flows through the graph during execution
-class AgentGraphState(BaseModel):
-    # References to persistent state
-    employee_state: Employee
-    game_state: GameState
-    
+Here is additional information about the restaurant:
+- Orders are created when the 'TakeOrder' tool is used in the dining area where there are customers who haven't ordered yet.
+- A newly created order is in the 'pending' state.
+- Orders are moved to the 'TAKEN' state when the 'NotifyKitchenOfOrders' tool is used in the kitchen.
+- Orders are moved to the 'COOKING' state when the 'Cook' tool is used in the kitchen.
+- Orders are moved to the 'READY' state when they are ready to be delivered to the customer.
+- Orders are moved to the 'DELIVERED' state when they are delivered to the customer.
+- Orders move strictly in the following order: pending -> taken -> cooking -> ready -> delivered
 
-# Employee controller class that processes employee actions
-class EmployeeAgentController:
-    def __init__(self): 
+Based on your instructions and the current state of the restaurant,
+decide what you should do next.
+
+Here is the current state of the restaurant:
+{observation}            
+End of restaurant state.
+
+Here are some of your recent thoughts and actions:
+{recent_thoughts}
+
+Plan your actions 2-3 steps ahead, describe your next move and rationale, and choose an action
+"""
+@dataclass
+class LLMResult:
+    tool_name: str
+    tool_args: Dict[str, Any]
+    tool_id: str
+    prompt: str
+    original_response: BaseMessage
+
+class ClaudeLLM:
+    """LLM for the employee agent"""
+    def __init__(self):
         self.model = "chatgpt"
         # Setup the LLM
         load_dotenv()
         chatgpt="gpt-4o-mini-2024-07-18"
         claude = "claude-3-5-haiku-latest"
-        llm = ChatAnthropic(
+        self.llm = ChatAnthropic(
             model=claude,
             temperature=0,
-            anthropic_api_key=get_anthropic_api_key()
+            anthropic_api_key=get_anthropic_api_key(),
         )
 
-        self.llm = llm.bind_tools(create_tools())
+    async def invoke(self, prompt, state_message, messages) -> LLMResult:
+        system_message = SystemMessage(content=prompt)
+        
+        # Explicit query at the end
+        human_message = HumanMessage(content="""
+    First, provide a short (one-sentence) summary of your next planned steps.
+    Then, immediately invoke exactly one available tool to carry out your very next action.
+    """)
+
+        llm = self.llm.bind_tools(create_tools())
+
+        start = time.perf_counter()
+        response = await llm.ainvoke([
+            system_message,
+            state_message,
+            *messages,
+            human_message
+        ])
+        end = time.perf_counter()
+        
+        print(f"LLM response time: {end - start} seconds")
+
+        result = LLMResult(
+            tool_name=response.tool_calls[0]["name"],
+            tool_args=response.tool_calls[0]["args"],
+            tool_id=response.tool_calls[0]["id"],
+            original_response=response,
+            prompt=prompt
+        )
+        return result    
+    
+
+class LlamaLLM:
+    def __init__(self):
+        self.llm = ChatOllama(model="mistral", temperature=0, verbose=True)
+
+    async def invoke(self, prompt: str, messages: List[BaseMessage]) -> LLMResult:
+        system_message = SystemMessage(content=prompt)
+        
+
+        # Explicit query at the end
+        query_message = HumanMessage(content="Based on the instructions, game state, and recent actions, what action should I perform next?")
+
+        llm = self.llm.bind_tools(create_tools())
+
+        start = time.perf_counter()
+        response = await llm.ainvoke([
+            system_message,
+            *messages,
+            query_message
+        ])
+        end = time.perf_counter()
+        
+        print(f"LLM response time: {end - start} seconds")
+
+        result = LLMResult(
+            tool_name=response.tool_calls[0]["name"],
+            tool_args=response.tool_calls[0]["args"],
+            tool_id=response.tool_calls[0]["id"],
+            original_response=response,
+            prompt=prompt
+        )
+        return result
 
 
-    def process(self, gameState: GameState, employeeId: str) -> Tuple[EmployeeAction, GameState]:
+
+# Employee controller class that processes employee actions
+class EmployeeAgentController:
+    def __init__(self, llm: ClaudeLLM | None = None):
+        self.llm = llm if llm else ClaudeLLM()
+
+    async def process(self, gameState: GameState, employeeId: str) -> List[AgentDecision]:
+        return await self.process_recursive(gameState, employeeId, 0)
+
+    async def process_recursive(self, _gameState: GameState, employeeId: str, attempt: int) -> List[AgentDecision]:
+        gameState = _gameState.model_copy(deep=True)
         employee = gameState.employees[employeeId]
-        # Construct prompt for planning
-        planning_template = """
-        You are {name}, an employee at a diner. Your instructions are: '{instruction}'
-
-        Only perform duties relevant to your instructions.
-
-        Here is some additional information that MAY OR MAY NOT be relavant to your role:
-        Subject: Orders
-        - Orders are created when athe 'TakeOrder' tool is used in the dining area where there are customers who haven't ordered yet.
-        - A newly created order is in the 'pending' state.
-        - Orders are moved to the 'TAKEN' state when the 'NotifyKitchenOfOrders' tool is used in the kitchen.
-        - Orders are moved to the 'COOKING' state when the 'Cook' tool is used in the kitchen.
-        - Orders are moved to the 'READY' state when they are ready to be delivered to the customer.
-        - Orders are moved to the 'DELIVERED' state when they are delivered to the customer
-        - Orders move strictly in the following order: pending -> taken -> cooking -> ready -> delivered
-        - Orders can only be delivered when the DeliverTool is used in the DINING ROOM.
-        - Orders cannot be delivered if the employee is not in the DINING ROOM.
-        - An employee must move to the dining room to deliver food to customers.
-
-        
-        Based on your instructions and the current state of the restaurant,
-        decide what you should do next.
-
-        Here is the current state of the restaurant:
-        {observation}            
-        End of restaurant state.
-
-
-        Here are some of your recent thoughts:
-        {recent_thoughts}
-
-        
-        Respond with no more than a single sentence describing your intention and then
-        choose the action you think is best based on your instructions.
-        """
-        
-        planning_prompt = PromptTemplate.from_template(planning_template)
-        
-        # Get all messages from the employee's history
-        #chat_history = "\n".join([msg.content for msg in state.employee_state.messages[-10:]])
-
-        observation = observe_environment(employee, gameState)
-
-        # Personal state
-        #ordersOwned = [o for o in gameState.orders.values() if o.server == employeeId]
-        #if ordersOwned:
-        #    observation += f"\nYou have {len(ordersOwned)} orders that must be brought to the kitchen."
-
-        recent_thoughts = employee.recentThoughts[-10:]
-        
-        planning_input = planning_prompt.format(
-            name=employee.name,
-            recent_thoughts=recent_thoughts,
-            instruction=employee.instruction,
-            observation=observation,
-        )
-        
-        # Add the planning query to employee's messages
-        planning_message = HumanMessage(content=planning_input)
-       
-
-        # Get a response from the LLM
-        startTime = time.perf_counter()
-        response = self.llm.invoke([*recent_thoughts, planning_message])
-        endTime = time.perf_counter()
-        print(f"Planning took {endTime - startTime} seconds")
-        selectedTool = None
-        selectedTool = response.content[1]
+        state_message = HumanMessage(content=f"Current game state:\n{gameState.to_prompt()}")
+        response = await self.llm.invoke(employee.instruction, state_message, employee.messages)
+        self.last_response = response
         # Update the employee's messages with the response
-        toolResult = parse_tool(selectedTool["name"], selectedTool["input"])
-        employee.action = toolResult
+        action = parse_tool(response.tool_name, response.tool_args)
+        # Set the employee's action directly to avoid any type issues
         # Does the response need to be saved to memory?
-        employee.add_thought(response)
+        employee.add_message(response.original_response)
 
-        result = None
-        match (toolResult):
-            case MoveTool(destination=destination):
-                result  = move_to_location(employee, gameState, destination)
-            case SeatTool():
-                result  = seat_customer(employee, gameState)
-            case TakeOrderTool():
-                result  = take_order(employee, gameState)
-            case CookTool(order_id=order_id):
-                result  = cook_food(employee, gameState, order_id)
-            case DeliverTool():
-                result  = deliver_food(employee, gameState)
-            case WaitTool():
-                result  = ActionResult(True, "Waiting for next instruction", gameState)
-            case NotifyKitchenOfOrdersTool():
-                result  = notify_kitchen_of_orders(employee, gameState)
-            case _:
-                raise Exception(f"Unknown tool: {toolResult}")
+        # This is a copy, do not try to mutate the original employee or game state
+        result = performAction(gameState, employee, action)
 
-        employee.add_thought(ToolMessage(content=result.message, type="tool", tool_call_id=selectedTool["id"]))
-        return employee.action, result.game_state
+        result.game_state.grab_employee(employeeId).add_message(ToolMessage(content=result.message, type="tool", tool_call_id=response.tool_id, status="success" if result.success else "error"))
 
+        if result.success:
+            # Update the game state with the result
+            return [AgentDecision(action=action, actionResult=result)]
+        elif attempt < 3:
+            # Retry the action
+            return [AgentDecision(action=action, actionResult=result), *await self.process_recursive(result.game_state, employeeId, attempt + 1)]
+        else:
+            raise Exception(f"Failed to process action for employee {employeeId} after 3 attempts")
+
+def performAction(gameState: GameState, employee: Employee, toolResult: EmployeeAction) -> ActionResult:
+    match (toolResult):
+        case MoveToNewRoom():
+            return validate_move_to_location(employee, gameState, toolResult)
+        case SeatAction():
+            return seat_customer(employee, gameState, toolResult)
+        case TakeOrderAction():
+            return take_order(employee, gameState, toolResult)
+        case CookAction():
+            return cook_food(employee, gameState, toolResult)
+        case HandOrderToCustomer():
+            return hand_food_to_customer(employee, gameState, toolResult)
+        case WaitAction():
+            return validate_wait(employee, gameState)
+        case SubmitOrdersToKitchen():
+            return validate_submit_orders_to_kitchen(employee, gameState)
+        case _:
+            raise Exception(f"Unknown tool: {toolResult}")

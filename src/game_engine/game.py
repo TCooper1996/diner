@@ -1,90 +1,117 @@
+import asyncio
+from functools import reduce
 import time
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from rich.console import Console
 
+from src.actions import EmployeeAction
+from src.actions.base import ActionResult
+from src.agents.RefinementAgent import RefinementAgent
+from src.game_engine.gameLogger import GameLogger
 from src.state.employee import Employee
 from src.agents.employeeAgent import EmployeeAgentController
+from rich.text import Text
 from src.game_engine.location import Location
 from src.state.customer import Customer
 from src.state.game import GameState
+from src.state.types import EmployeeTurn
+from src.utils.async_reduce import async_reduce
+
 
 class Game:
     def __init__(self):
+        self.message = ""
         self.console = Console()
         self.state = GameState()
-        self.employees: Dict[str, Employee] = {}
         self.agent_controller = EmployeeAgentController()  # Create a single agent controller
         self.customer_timer = 0
         self.max_wait_time = 20  # game ticks before customers leave unhappy
         
-    def setup_employees(self):
+    def setup_employees(self, employeeInstructions: List[Tuple[str, str]]):
         """Get instructions from the player for each employee"""
         self.console.print("\n[bold green]Welcome to Diner Simulator![/bold green]")
         self.console.print("You need to instruct your employees on how to run the restaurant.")
-        
         # Create employees with player-provided instructions
-        instructions = ["Seat the customers when they arrive", "take orders from the customers after they are seated and bring them to the kitchen", "cook the food and deliver it to the customers"]
-        employee_names = ["Jim", "Alice", "Bob"]
-        for i, name in enumerate(employee_names):
+        for instructions, name in employeeInstructions:
             self.console.print(f"\n[bold]Employee: {name}[/bold]")
-            instruction = instructions[i]  # input(f"What instructions would you like to give {name}? ")
-            print(f"{name} will {instruction}")
+            print(f"{name} will {instructions}")
             
             # Create the employee and add to state
-            self.employees[name] = Employee(name=name, instruction=instruction)
-            self.state.employees[name] = self.employees[name]
+            self.state.employees[name] = Employee(name=name, instruction=instructions)
             
         self.console.print("\n[bold green]All employees have been instructed![/bold green]")
         self.console.print("The simulation will now begin...\n")
-        time.sleep(2)
 
-    def start(self):
+    async def start(self, writer: GameLogger):
+        self.writer = writer
         """Start the game"""
-        self.setup_employees()
+        instructions = ["Seat the customers when they arrive", "take orders from the customers after they are seated and bring them to the kitchen", "cook the food and deliver it to the customers"]
+        start = time.perf_counter()
+        refinedInstructions = await asyncio.gather(*[RefinementAgent().refine_prompt(instruction) for instruction in instructions])
+        end = time.perf_counter()
+        writer.log_message(f"Refinement time: {end - start} seconds")
+
+        employee_names = ["Jim", "Alice", "Bob"]
+        self.setup_employees(list(zip(refinedInstructions, employee_names)))
         
         game_over = False
         tick = 0
         
         # Add initial customer
         self.state.add_customer(Customer())
+
+        await self.loop(self.state, tick)
+
         
-        while not game_over:
-            tick += 1
-            self.console.print(f"\n[bold blue]===== Tick {tick} =====[/bold blue]")
-            
-            # Run each employee's turn
-            for name, employee in self.employees.items():
-                # Process returns both the action result and the updated state
-                action_result, updated_state = self.agent_controller.process(self.state, employee.name)
-                self.console.print(f"[bold green][{employee.name}[/bold green]] Location: {employee.location}; {action_result}")
-                self.console.print(f"[bold green][{employee.name}[/bold green]] '{employee.last_thought()}'")
-                
-                # Set the game state to the updated state returned by the agent
-                self.state = updated_state
+
+    async def loop(self, gamestate: GameState, tick: int):
+        writer = self.writer
+        writer.turn_started()
+        
+        # Run each employee's turn
+        updated_state = gamestate.model_copy(deep=True)
+        employee_names = list(updated_state.employees.keys())
 
             
-            # Check win/loss conditions
-            if tick % 5 == 0 and len(self.state.customers) < 3:  # Add new customer every 5 ticks
-                self.state.add_customer(Customer())
-                self.console.print("[bold yellow]A new customer has arrived![/bold yellow]")
-                
-            # Update customer wait times and check for unhappy customers
-            unhappy_customers = self.state.update_customers()
-            if unhappy_customers > 0:
-                self.console.print(f"[bold red]{unhappy_customers} customer(s) left unhappy![/bold red]")
-                
-            if self.state.unhappy_customers >= 3:
-                game_over = True
-                self.console.print("\n[bold red]GAME OVER![/bold red] Too many unhappy customers.")
-                retry = input("\nWould you like to try again with new instructions? (y/n): ")
-                if retry.lower() == 'y':
-                    self.__init__()  # Reset game state
-                    self.start()
-                    return
+        stateHistory = await async_reduce(self.employee_turn, employee_names, updated_state)
+        state2 = stateHistory[-1].current_state()
 
-            # print status of customers
-            for customer_id, customer in self.state.customers.items():
-                self.console.print(f"[[bold yellow]{customer.name}[/bold yellow]] Status: {customer.status}, Waiting Time: {customer.waiting_time}, Location: {customer.location}")
+        
+        # Check win/loss conditions
+        if tick % 5 == 0 and len(state2.customers) < 3:  # Add new customer every 5 ticks
+            c = Customer()
+            state2.add_customer(c)
+            writer.new_customer(c.name, "A new customer has arrived!")
             
-            # Short pause between ticks for readability
-            time.sleep(0.6)
+        # Update customer wait times and check for unhappy customers
+        customers_leaving = state2.update_customers()
+        for customer_id, happy in customers_leaving:
+            if not happy:
+                state2.unhappy_customers += 1
+            c = gamestate.grab_customer(customer_id)
+            writer.customer_left(c.name, happy, f"left {'happy' if happy else 'unhappy'}!")
+            
+        if state2.unhappy_customers > 0:
+            writer.game_over("Too many unhappy customers!")
+            return
+
+        # print status of customers
+        for customer_id, customer in state2.customers.items():
+            writer.customer_status(customer.name, f"Status: {customer.status}, Waiting Time: {customer.waiting_time}, Location: {customer.location}")
+        
+        # Short pause between ticks for readability
+        await self.loop(state2, tick + 1)
+        await asyncio.sleep(0.1)
+
+
+
+    async def employee_turn(self, _gamestate: GameState, name: str) -> EmployeeTurn:
+        gamestate = _gamestate.model_copy(deep=True)
+        # Process returns both the action result and the updated state
+        results = EmployeeTurn(employee_name=name, decisions= await self.agent_controller.process(gamestate, name))
+        employee = results.current_state().grab_employee(name)
+        self.log_employee_turn(employee, results.action())
+        return results
+    
+    def log_employee_turn(self, employee: Employee, action: EmployeeAction):
+        self.writer.employee_turn(employee.name, f"Location={employee.location}, action={repr(action)}, decision_text={employee.last_decision_text()}, decision_result={employee.last_decision_result()}")

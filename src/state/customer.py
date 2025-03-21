@@ -23,15 +23,29 @@ def randomName():
     last_name = sample(customerLastnames, 1)[0]
     return f"{first_name} {last_name}"
 
+class CustomerStatus(Enum):
+    WAITING = "waiting"
+    SEATED = "seated"
+    ORDERED = "ordered"
+    EATING = "eating"
+    DONE = "done"
+
 class Customer(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])  # Short ID for the customer
     name: str = Field(default_factory=randomName)  # Random name from the list
     location: Location = Field(default=ENTRANCE)
     waiting_time: int = Field(default=0)
     patience: int = Field(default=15)  # Will leave unhappy after this many ticks
-    status: str = Field(default="waiting")  # waiting, seated, ordered, eating, done
+    status: CustomerStatus = Field(default=CustomerStatus.WAITING)  # waiting, seated, ordered, eating, done
     order: List[OrderItem] = Field(default=["burger"])  
     eating_time: int = Field(default=0)  # Tracks how long they've been eating
+
+    def to_prompt(self) -> str:
+        return f"""
+Customer: {self.name}
+    Location: {self.location}
+    Status: {self.status.value}
+"""
     
     def take_order(self) -> List[OrderItem]:
         """ Returns the customers desired order"""

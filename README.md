@@ -1,48 +1,71 @@
-# Diner Simulation Game
+# 🍽️ Diner Simulation Game
 
-A terminal-based restaurant management game where you instruct AI employees to serve customers through natural language prompts.
+A **terminal-based restaurant management game** where the player **instructs AI-powered employees** to serve customers through **natural language prompts**.
 
-## About LangGraph Multi-Node Architecture
+---
 
-This game demonstrates the power of LangGraph's multi-node architecture. Each employee in the game is powered by a LangGraph with multiple specialized nodes:
+## **🏡 Game Setting**
+You own a restaurant and must manage your employees to keep it running smoothly. 
 
-1. **Perception Node**: Observes the environment and gathers information about the restaurant state
-2. **Planning Node**: Decides what action to take based on instructions and current state
-3. **Action Nodes**: Specialized nodes for different actions (move, seat customers, take orders, etc.)
+**Key Tasks:**
+- Seat customers as they arrive.
+- Take and submit customer orders.
+- Cook and serve food to the correct customers.
+- Clean tables after customers leave.
 
-Benefits of this multi-node approach:
+**Game Mechanics:**
+- Customers have expectations. If they receive **incorrect food** or are served **too late**, they become unhappy, which lowers the player's score.
+- Employees **do not have predefined roles**—the player assigns them responsibilities through prompts before each level.
 
-- **Separation of Concerns**: Each node handles a specific function (perception, planning, action)
-- **Conditional Routing**: The planning node routes to the appropriate action node
-- **State Management**: State is passed and updated between nodes
-- **Customized Prompting**: Each node can use different prompts optimized for its specific task
-- **Focused Decision Making**: Breaking the agent's work into smaller steps leads to better outcomes
+---
 
-## Setup
+## **🛠️ Game Interactions**
+### **Player Role**
+The player **writes a prompt** to instruct each AI-powered employee on how they should behave. These instructions influence how each employee reacts to the game state.
 
-1. Install the required packages:
-```bash
-pip install -r requirements.txt
-```
+### **AI Employees**
+- Employees use **LLM-based decision-making** to select an action each turn.
+- Employees **can only perform predefined actions** using **Tool Calling**.
+- Each employee **invokes exactly 1 tool per turn**.
 
-2. Set up your Anthropic API key:
-   - Copy `example.env` to `.env`
-   - Add your Anthropic API key to the `.env` file
+Employees **must be explicitly instructed** on which actions they should prioritize. For example, a waiter should not decide to **randomly start cooking** unless explicitly told.
 
-## Running the Game
+---
 
-```bash
-python src/main.py
-```
+## **🎯 Objective**
+Each level has a set number of customers who will enter the restaurant over time. The goal is to:
+1. Seat all customers properly.
+2. Take and submit their orders to the kitchen.
+3. Cook and serve orders in a timely manner.
+4. Keep customers happy by delivering correct food **before they get impatient**.
+5. Clean tables to allow new customers to sit.
 
-## How to Play
+The level ends when **all customers have been served and have left**.
 
-1. When the game starts, you'll be asked to give instructions to each employee
-2. Craft your instructions carefully to create an efficient restaurant system
-3. For example:
-   - Jim: "Stay at the entrance and seat any customers who arrive"
-   - Alice: "Take orders from seated customers and bring them to the kitchen"
-   - Bob: "Cook any orders that come to the kitchen and have them ready for delivery"
+---
 
-4. Watch as your employees follow your instructions automatically
-5. If too many customers leave unhappy, you'll get a chance to adjust your instructions
+## **🔄 Game Loop (Tick-Based Simulation)**
+### **1️⃣ Pre-Game Phase (Prompting Employees)**
+Before the level starts, the player **writes a natural language prompt** for each employee. For example:
+
+- **Alice:** `"Alice will seat customers as they arrive."`
+- **Jim:** `"Jim will take orders from seated customers, submit them to the kitchen, and deliver the food once cooked."`
+- **Bob:** `"Bob will cook any orders that are submitted to the kitchen."`
+
+### **2️⃣ Simulation Phase (AI Decision-Making)**
+- The game progresses in discrete **ticks** (like in-game minutes).
+- Each tick, employees **observe the game state** and choose an action **based on their prompt**.
+- **One employee acts per tick** (they take turns).
+- Employees invoke **exactly one tool per tick** to update the game state.
+
+### **3️⃣ End of Tick**
+- Once **all employees have acted**, the tick ends.
+- The loop repeats until all customers have been served.
+
+---
+
+## **🚀 Additional Notes**
+- **No direct player control during simulation:** The player **only defines the initial prompts**—employees act autonomously after that.
+- **AI Employees follow instructions but may make mistakes** if prompts are unclear.
+- **Tool calling is strictly enforced**—an employee can only perform actions using predefined tools.
+- **Customers have patience levels**, and delaying their service too long **reduces the score**.

@@ -6,6 +6,7 @@ from typing import Dict
 import pytest
 
 from src.agents.RefinementAgent import RefinementAgent
+from src.agents.models.Claude import Claude
 
 # Add the src directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -18,16 +19,17 @@ from src.state.customer import Customer
 from src.game_engine.location import  DINING, ENTRANCE, KITCHEN
 from src.agents.employeeAgent import EmployeeAgentController
 
+agent_controller = EmployeeAgentController(Claude(create_tools()))
+
+# Create a game state
+game_state = GameState()
 @pytest.mark.asyncio
-class TestEmployeeAgent(unittest.TestCase):
+class TestEmployeeAgent:
     def setUp(self):
         """Set up test environment before each test case"""
         # Create an agent controller
-        self.agent_controller = EmployeeAgentController()
         
-        # Create a game state
-        self.game_state = GameState()
-        
+    @pytest.mark.asyncio
     async def test_seating_host_behavior(self):
         """Test that an employee instructed to seat customers does so when there are waiting customers"""
         # Create an employee with instructions to seat customers
@@ -35,17 +37,17 @@ class TestEmployeeAgent(unittest.TestCase):
         host.location = "entrance"  # Explicitly set location to entrance
         
         # Add the employee to the game state
-        self.game_state.employees[host.name] = host
+        game_state.employees[host.name] = host
         
         # Add a waiting customer
         customer = Customer()
-        self.game_state.add_customer(customer)
+        game_state.add_customer(customer)
         
         # Process the host's turn
-        result, updated_state = await self.agent_controller.process(self.game_state, host.name)
+        updated_state = await agent_controller.process(game_state, host.name)
         
         # Check that the host tried to seat the customer
-        self.assertEqual(SeatAction(), result.action)
+        assert SeatAction() == 
         
         # Verify customer was moved to dining area
         self.assertEqual(updated_state.customers[customer.id].location, DINING)
@@ -58,12 +60,12 @@ class TestEmployeeAgent(unittest.TestCase):
         host.location = "entrance"  # Explicitly set location to entrance
         
         # Add the employee to the game state
-        self.game_state.employees[host.name] = host
+        game_state.employees[host.name] = host
         
         # No customers added
         
         # Process the host's turn
-        result, updated_state = await self.agent_controller.process(self.game_state, host.name)
+        result, updated_state = await agent_controller.process(game_state, host.name)
         employeeState = updated_state.employees[host.name].action
         
         # Check that the host observed there are no customers
@@ -76,16 +78,16 @@ class TestEmployeeAgent(unittest.TestCase):
         waiter.location = "dining"  # Set location to dining area
         
         # Add the waiter to the game state
-        self.game_state.employees[waiter.name] = waiter
+        game_state.employees[waiter.name] = waiter
         
         # Add a seated customer
         customer = Customer()
         customer.location = DINING
         customer.status = "seated"
-        self.game_state.add_customer(customer)
+        game_state.add_customer(customer)
         
         # Process the waiter's turn
-        result, updated_state = await self.agent_controller.process(self.game_state, waiter.name)
+        result, updated_state = await agent_controller.process(game_state, waiter.name)
         
         # Check that the waiter took the customer's order
         self.assertEqual(TakeOrderAction(), result.action)
@@ -103,16 +105,16 @@ class TestEmployeeAgent(unittest.TestCase):
         waiter.location = "entrance"  # Start at entrance
         
         # Add the waiter to the game state
-        self.game_state.employees[waiter.name] = waiter
+        game_state.employees[waiter.name] = waiter
         
         # Add a seated customer
         customer = Customer()
         customer.location = DINING
         customer.status = "seated"
-        self.game_state.add_customer(customer)
+        game_state.add_customer(customer)
         
         # Process the waiter's turn
-        result, updated_state = await self.agent_controller.process(self.game_state, waiter.name)
+        result, updated_state = await agent_controller.process(game_state, waiter.name)
         
         # Check that the waiter moved to the dining area
         self.assertEqual(MoveToNewRoom(destination=DINING), result.action)
@@ -126,19 +128,19 @@ class TestEmployeeAgent(unittest.TestCase):
         cook.location = "kitchen"  # Set location to kitchen
         
         # Add the cook to the game state
-        self.game_state.employees[cook.name] = cook
+        game_state.employees[cook.name] = cook
         
         # Add a customer with an order
         customer = Customer()
         customer.status = "ordered"
-        self.game_state.add_customer(customer)
+        game_state.add_customer(customer)
         
         # Create an order for the customer
         order = Order(customer_id=customer.id, items=["burger", "fries"], server=cook.name, status=OrderStatus.TAKEN)
-        self.game_state.orders[order.id] = order
+        game_state.orders[order.id] = order
         
         # Process the cook's turn
-        result, updated_state = await self.agent_controller.process(self.game_state, cook.name)
+        result, updated_state = await agent_controller.process(game_state, cook.name)
         
         # Check that the cook prepared the food - actual order_id will be generated dynamically
         self.assertEqual(result.action, CookAction(order_id=order.id))
@@ -159,7 +161,7 @@ class TestEmployeeAgent(unittest.TestCase):
         cook.location = "kitchen"
         
         # Add employees to game state
-        self.game_state.employees = {
+        game_state.employees = {
             host.name: host,
             waiter.name: waiter,
             cook.name: cook
@@ -167,34 +169,34 @@ class TestEmployeeAgent(unittest.TestCase):
         
         # Add a waiting customer
         customer1 = Customer()
-        self.game_state.add_customer(customer1)
+        game_state.add_customer(customer1)
         
         # First turn: host should seat the customer
-        result1, state1 = await self.agent_controller.process(self.game_state, host.name)
+        result1, state1 = await agent_controller.process(game_state, host.name)
         self.assertEqual(SeatAction(), result1.action)
         
         # Second turn: waiter should take the customer's order
-        result2, state2 = await self.agent_controller.process(state1, waiter.name)
+        result2, state2 = await agent_controller.process(state1, waiter.name)
         self.assertEqual(TakeOrderAction(), result2.action)
 
         # Third turn: waiter should move to the kitchen
-        result3, state3 = await self.agent_controller.process(state2, waiter.name)
+        result3, state3 = await agent_controller.process(state2, waiter.name)
         self.assertEqual(MoveToNewRoom(destination=KITCHEN), result3.action)
 
         # Fourth turn: waiter should notify the kitchen of the order
-        result4, state4 = await self.agent_controller.process(state3, waiter.name)
+        result4, state4 = await agent_controller.process(state3, waiter.name)
         self.assertEqual(SubmitOrdersToKitchen(), result4.action)
 
         # Fifth turn: cook should prepare the food
-        result5, state5 = await self.agent_controller.process(state4, cook.name)
+        result5, state5 = await agent_controller.process(state4, cook.name)
         self.assertIsInstance(result5.action, CookAction)
 
         # Sixth turn: cook should move to the dining area
-        result6, state6 = await self.agent_controller.process(state5, cook.name)
+        result6, state6 = await agent_controller.process(state5, cook.name)
         self.assertEqual(MoveToNewRoom(destination=DINING), result6.action)
 
         # Seventh turn: cook should deliver the food
-        result7, state7 = await self.agent_controller.process(state6, cook.name)
+        result7, state7 = await agent_controller.process(state6, cook.name)
         self.assertEqual(HandOrderToCustomer(), result7.action)
         self.assertEqual(state7.customers[customer1.id].status, "eating")
         # There should be no more orders

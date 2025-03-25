@@ -18,6 +18,7 @@ class ToolResultMessage(BaseModel):
     tool: str
     tool_output: str
     tool_id: str
+    is_error: bool
 
 
 StandardMessage = Union[ResponseMessage, ToolInvocationMessage, ToolResultMessage, HumanMessage, SystemMessage]
@@ -35,7 +36,7 @@ def StandardToOpenAIMessages(_messages: List[StandardMessage]) -> List[BaseMessa
             case ToolInvocationMessage():
                 messages[-1].content.append({"type": "tool_use", "name": m.tool, "input": m.tool_input, "id": m.tool_id})
             case ToolResultMessage():
-                messages.append(HumanMessage(content = [{"type": "tool_result",  "content": m.tool_output, "tool_use_id": m.tool_id}]))
+                messages.append(HumanMessage(content = [{"type": "tool_result",  "content": m.tool_output, "tool_use_id": m.tool_id, "is_error": m.is_error}]))
             case HumanMessage():
                 messages.append(m)
             case SystemMessage():

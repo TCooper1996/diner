@@ -4,6 +4,7 @@ import time
 from typing import Coroutine, Dict, List, Annotated, TypedDict, Callable, Any, Optional, Tuple
 import os
 import json
+import pickle
 
 from dotenv import load_dotenv
 from langchain_ollama import ChatOllama
@@ -12,10 +13,10 @@ from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, BaseMe
 
 from src.agents.models.Model import Model, ResponseMessage, ToolInvocationMessage, ToolResultMessage
 from src.agents.observe import observe_environment
-from src.state.employee import Employee
+from src.state.employee import Employee, EmployeeTurn
 from src.state.game import GameState
 from src.game_engine.location import Location
-from src.state.types import AgentDecision, EmployeeTurn
+from src.state.types import AgentDecision
 from src.utils.env import get_anthropic_api_key
 
 # Import actions from the new actions package
@@ -57,6 +58,9 @@ class LLMResult:
     prompt: str
     original_response: ResponseMessage
 
+    def to_dict(self) -> Dict[str, Any]:
+        return self.__dict__
+
 class LLM:
     """LLM for the employee agent"""
     def __init__(self, model: Model):
@@ -67,14 +71,35 @@ class LLM:
             temperature=0
         )
 
-    async def invoke(self, prompt, state_message, messages) -> LLMResult:
+    async def invoke_cached(self, prompt, state_message, messages) -> LLMResult:
+        # caching
+        cache = {}
+        if os.path.exists("responses.json"):
+            with open("responses.json", "rb") as f:
+                cache = pickle.load(f)
+        key = str({"prompt": prompt, "state_message": state_message, "messages": [repr(m) for m in messages]})
+        if key in cache:
+            return cache[key]
+        response = await self.invoke(prompt, state_message, messages)
+        cache[key] = response
+        with open("responses.json", "wb") as f:
+            pickle.dump(cache, f)
+        return response
+
+    async def invoke(self, prompt, state_message, _messages) -> LLMResult:
+        
         system_message = SystemMessage(content=prompt)
+        messages = [*_messages]
+
+        if len(messages) > 0:
+            if messages[-1].is_error:
+                messages.append(HumanMessage(content="Tool invocation failed: Your last action was invalid. Try again."))
+            else:
+                messages.append(HumanMessage(content="Tool invocation successful"))
         
         # Explicit query at the end
         human_message = HumanMessage(content="""
         You must invoke exactly ONE tool provided to you.
-    Do NOT describe or summarize.
-    Invoke the tool immediately and explicitly.
     """)
 
         i = -1
@@ -115,31 +140,48 @@ class EmployeeAgentController:
     def __init__(self, llm: Model):
         self.llm = LLM(llm)
 
-    async def process(self, gameState: GameState, employeeId: str) -> List[AgentDecision]:
+    async def process(self, gameState: GameState, employeeId: str) -> GameState:
         return await self.process_recursive(gameState, employeeId, 0)
 
-    async def process_recursive(self, _gameState: GameState, employeeId: str, attempt: int) -> List[AgentDecision]:
+    async def process_recursive(self, _gameState: GameState, employeeId: str, attempt: int) -> GameState:
         gameState = _gameState.model_copy(deep=True)
-        employee = gameState.employees[employeeId]
         state_message = HumanMessage(content=f"Your name is : {employeeId}. \nCurrent game state:\n{gameState.to_prompt()}")
-        response = await self.llm.invoke(employee.instruction, state_message, employee.messages)
-        self.last_response = response
+        
+        employee = gameState.employees[employeeId]
+        response = await self.llm.invoke_cached(employee.instruction, state_message, employee.get_messages())
         # Update the employee's messages with the response
         action = parse_tool(response.tool_name, response.tool_args)
 
         # This is a copy, do not try to mutate the original employee or game state
         result = performAction(gameState, employee, action)
-        newEmployee = result.game_state.grab_employee(employeeId)
-        newEmployee.add_message(response.original_response)
-        newEmployee.add_message(ToolInvocationMessage(tool=response.tool_name, tool_input=response.tool_args, tool_id=response.tool_id))
-        newEmployee.add_message(ToolResultMessage(tool_output=result.message, tool_id=response.tool_id, tool=response.tool_name))
 
+        decision = AgentDecision(action=repr(action), 
+                                 response=ResponseMessage(content=response.original_response.content),
+                                 result=ToolResultMessage(tool=response.tool_name, tool_id= response.tool_id, tool_output=result.message, is_error=not result.success),
+                                 invocation=ToolInvocationMessage(tool=response.tool_name, tool_input=response.tool_args, tool_id=response.tool_id),
+                                 )
+        newEmployee = result.game_state.grab_employee(employeeId)
+        if attempt == 0:
+            newEmployee.new_turn(decision)
+        else:
+            newEmployee.add_to_current_turn(decision)
+
+        with open("responses1.txt", "a") as f:
+            f.write(f"Turn: {gameState.tick}\n")
+            f.write(f"Attempt: {attempt}\n")
+            f.write(f"Employee: {employeeId}\n")
+            f.write(f"Prompt: {response.prompt}\n")
+            f.write(f"Response: {response.original_response.content}\n")
+            f.write(f"Action: {repr(action)}\n")
+            f.write(f"Result: {result.message}\n")
+            f.write("\n")
+        
         if result.success:
             # Update the game state with the result
-            return [AgentDecision(action=action, actionResult=result)]
+            return result.game_state
         elif attempt < 3:
             # Retry the action
-            return [AgentDecision(action=action, actionResult=result), *await self.process_recursive(result.game_state, employeeId, attempt + 1)]
+            return await self.process_recursive(result.game_state, employeeId, attempt + 1)
         else:
             raise Exception(f"Failed to process action for employee {employeeId} after 3 attempts")
 

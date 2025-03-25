@@ -1,16 +1,19 @@
+import json
 from typing import Dict, List, Optional, Tuple
 from enum import Enum
 
 from pydantic import BaseModel, Field
+from itertools import chain, cycle, groupby, zip_longest
 
 from src.state.employee import Employee
 from src.game_engine.location import *
 from src.state.customer import Customer
 from src.state.order import Order, OrderItem, OrderStatus
+from src.state.types import EmployeeTurn, GameTurn
 
 
 class GameState(BaseModel):
-    message: str = Field(default="")
+    tick: int = Field(default=0)
     customers: Dict[str, Customer] = Field(default_factory=dict)
     orders: Dict[str, Order] = Field(default_factory=dict)
     unhappy_customers: int = Field(default=0)
@@ -22,6 +25,18 @@ class GameState(BaseModel):
     order_carriers: Dict[str, List[str]] = Field(default_factory=dict)
 
     def to_prompt(self) -> str:
+        employees = [self.grab_employee(e) for e in self.employees]
+        employee_dict = {e.name: {
+            "location": e.location,
+            "orders_taken": [repr(o) for o in self.orders_taken_by_employee(e.name)],
+            "orders_being_carried": [repr(o) for o in self.orders_carried_by_employee(e.name)]
+        } for e in employees}
+        d = {
+            "employees": employee_dict,
+            "customers": {c.name:{"status": c.status.value, "orders": [repr(o) for o in self.get_customers_orders(c.id)]} for c in self.customers.values()},
+            "orders": {f"#{o.id}": {"status": o.status.value, "items": o.items, "order#": o.id} for o in self.orders.values()},
+        }
+        return json.dumps(d, indent=4)
         employee_str = "\n".join(e.to_prompt() for e in self.employees.values())
         customer_str = "\n".join(c.to_prompt() for c in self.customers.values())
         order_str = "\n".join(o.to_prompt() for o in self.orders.values())
@@ -41,6 +56,8 @@ Order Takers:
 
 
 """
+
+    
 
     def assign_order_to_employee(self, employee_name: str, order_id: str):
         if employee_name not in self.order_takers:
@@ -64,10 +81,20 @@ Order Takers:
         return list(map(self.grab_order, self.order_takers.get(employee_name, [])))
     
     def orders_carried_by_employee(self, employee_name: str) -> List[Order]:
-        return list(map(self.grab_order, self.order_carriers[employee_name]))
+        return list(map(self.grab_order, self.order_carriers.get(employee_name, [])))
 
     def grab_employee(self, employee_name: str) -> Employee:
         return self.employees[employee_name]
+
+    def employee_turns(self) -> List[GameTurn]:
+        turns = [enumerate(e.get_turns()) for e in self.employees.values()]
+        chained = chain.from_iterable(turns)
+        sorted_turns = sorted(chained, key=lambda t: t[0])
+        groups = groupby(sorted_turns, lambda t: t[0])
+        without_index = [[t[1] for t in list(group[1])] for group in groups]
+        return [GameTurn(employees=group) for group in without_index]
+
+        
 
     def  get_customer(self, customer_id: str) -> Optional[Customer]:
         """Get a customer by ID"""
@@ -91,6 +118,9 @@ Order Takers:
         """Get customers waiting at the entrance"""
         return [c for c in self.customers.values() 
                 if c.location == ENTRANCE and c.status == "waiting"]
+
+    def get_customers_orders(self, customer_id: str) -> List[Order]:
+        return [o for o in self.orders.values() if o.customer_id == customer_id]
     
     def get_seated_customers(self):
         """Get customers seated in the dining area waiting to order"""
@@ -100,8 +130,12 @@ Order Takers:
     def get_order(self, order_id: str) -> Optional[Order]:
         return self.orders.get(order_id)
 
-    def grab_order(self, order_id: str) -> Order:
-        return self.orders[order_id]
+    def grab_order(self, /, order_id: str | None = None, customer_id: str | None = None) -> Order:
+        if order_id:
+            return self.orders[order_id]
+        if customer_id:
+            return [o for o in self.orders.values() if o.customer_id == customer_id][0]
+        raise ValueError("Must provide either order_id or customer_id")
     
     def get_pending_orders(self):
         """Get orders that need to be cooked"""

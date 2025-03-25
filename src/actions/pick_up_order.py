@@ -15,12 +15,13 @@ class PickUpOrder(BaseModel):
 
 
 @copy_args
-def pick_up_order(employee: Employee, game_state: GameState, order_id: str) -> ActionResult:
+def pick_up_order(employee: Employee, game_state: GameState, args: PickUpOrder) -> ActionResult:
+    order_id = args.order_id
     if employee.location != "kitchen":
         return ActionResult(False, f"{employee.name} cannot pick up an order from the {employee.location}. You must be in the kitchen.", game_state)
 
     # Find orders that are ready to be picked up
-    ready_orders = game_state.get_ready_orders()
+    ready_orders = {order.id:order for order in game_state.get_ready_orders()}
 
     if not ready_orders:
         return ActionResult(False, f"There is no order ready for {employee.name} to pick up.", game_state)

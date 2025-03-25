@@ -1,20 +1,28 @@
 
+from dataclasses import dataclass
 from typing import List
 from pydantic import BaseModel
-from src.actions import EmployeeAction
-from src.actions.base import ActionResult
-from src.state.game import GameState
+from src.agents.models.Model import ResponseMessage, StandardMessage, ToolInvocationMessage, ToolResultMessage
 
 
 class AgentDecision(BaseModel):
     """
     Represents the decision made by an agent, which may have been valid or invalid
     """
-    action: EmployeeAction
-    actionResult: ActionResult
+    response: ResponseMessage
+    invocation: ToolInvocationMessage
+    result: ToolResultMessage
+    action: str
 
-    def current_state(self) -> GameState:
-        return self.actionResult.game_state
+
+    def get_action(self) -> str:
+        return repr(self.action)
+    
+    def get_result(self) -> str:
+        return self.result.tool_output
+    
+    def get_response(self) -> str:
+        return self.response.content
 
 
 class EmployeeTurn(BaseModel):
@@ -27,8 +35,9 @@ class EmployeeTurn(BaseModel):
     employee_name: str
     decisions: List[AgentDecision]
 
-    def current_state(self) -> GameState:
-        return self.decisions[-1].actionResult.game_state
-
-    def action(self) -> EmployeeAction:
+    def action(self) -> str:
         return self.decisions[-1].action
+
+
+class GameTurn(BaseModel):
+    employees: List[EmployeeTurn]

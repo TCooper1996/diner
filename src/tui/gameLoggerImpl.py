@@ -2,7 +2,7 @@ from src.game_engine.gameLogger import GameLogger
 from textual.widgets import Footer, Header, RichLog
 from rich.text import Text
 
-free_colors = ["blue", "green",  "pink"]
+free_colors = ["blue", "green",  "yellow"]
 employee_color_map = {}
 
 def employee_color(employee_name: str) -> str:

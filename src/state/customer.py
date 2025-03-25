@@ -1,14 +1,15 @@
 import uuid
 from typing import List, Optional
 from random import sample
+from hashlib import sha256
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 from src.game_engine.location import *
 from src.state.order import OrderItem
 
 customerNames = [
-    "Alice", "Bob", "Charlie", "Diana", "Eve", "Frank", "Grace", "Heidi",
+    "Charlie", "Diana", "Eve", "Frank", "Grace", "Heidi",
     "Ivan", "Judy", "Karl", "Leo", "Mallory", "Nina", "Oscar", "Peggy",
     "Quentin", "Rupert", "Sybil", "Trent", "Uma", "Victor", "Walter"]
 
@@ -17,11 +18,14 @@ customerLastnames = [
     "Wilson", "Moore", "Taylor", "Anderson", "Thomas", "Jackson", "White",
     "Harris", "Martin", "Thompson", "Garcia", "Martinez", "Robinson"]
 
-def randomName():
+names = [f"{f} {l}" for f, l in zip(customerNames, customerLastnames)]
+index = 0
+def nextName():
     """Generate a random name for a customer"""
-    first_name = sample(customerNames, 1)[0]
-    last_name = sample(customerLastnames, 1)[0]
-    return f"{first_name} {last_name}"
+    global index
+    name= names[index]
+    index += 1
+    return name
 
 class CustomerStatus(Enum):
     WAITING = "waiting"
@@ -31,14 +35,18 @@ class CustomerStatus(Enum):
     DONE = "done"
 
 class Customer(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])  # Short ID for the customer
-    name: str = Field(default_factory=randomName)  # Random name from the list
+    name: str = Field(default_factory=nextName)  # Random name from the list
     location: Location = Field(default=ENTRANCE)
     waiting_time: int = Field(default=0)
     patience: int = Field(default=15)  # Will leave unhappy after this many ticks
     status: CustomerStatus = Field(default=CustomerStatus.WAITING)  # waiting, seated, ordered, eating, done
     order: List[OrderItem] = Field(default=["burger"])  
     eating_time: int = Field(default=0)  # Tracks how long they've been eating
+
+    @computed_field
+    @property # type: ignore
+    def id(self) -> str:
+        return sha256(self.name.encode('utf-8')).hexdigest()
 
     def to_prompt(self) -> str:
         return f"""

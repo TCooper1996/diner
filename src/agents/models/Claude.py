@@ -11,6 +11,7 @@ class Claude(Model):
     def __init__(self, tools: List):
         load_dotenv()
         claude = "claude-3-5-haiku-latest"
+        # type: ignore
         self.llm = ChatAnthropic(
             model=claude,
             temperature=0,

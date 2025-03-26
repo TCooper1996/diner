@@ -1,5 +1,5 @@
 from src.actions.cook import CookAction, cook_food
-from src.state.employee import Employee
+from src.state.employee.employee import Employee
 from src.state.game import GameState
 from src.state.order import Order, OrderStatus
 

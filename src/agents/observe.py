@@ -3,7 +3,7 @@
 import time
 from src.actions.base import ActionResult
 from src.state.game import GameState, OrderStatus
-from src.state.employee import Employee
+from src.state.employee.employee import Employee
 from src.game_engine.location import DINING, ENTRANCE, KITCHEN
 
 def observe_environment(employee: Employee, game_state: GameState) -> str:

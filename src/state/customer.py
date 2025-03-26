@@ -1,3 +1,4 @@
+from dataclasses import dataclass, field
 import uuid
 from typing import List, Optional
 from random import sample
@@ -34,19 +35,19 @@ class CustomerStatus(Enum):
     EATING = "eating"
     DONE = "done"
 
-class Customer(BaseModel):
-    name: str = Field(default_factory=nextName)  # Random name from the list
-    location: Location = Field(default=ENTRANCE)
-    waiting_time: int = Field(default=0)
-    patience: int = Field(default=15)  # Will leave unhappy after this many ticks
-    status: CustomerStatus = Field(default=CustomerStatus.WAITING)  # waiting, seated, ordered, eating, done
-    order: List[OrderItem] = Field(default=["burger"])  
-    eating_time: int = Field(default=0)  # Tracks how long they've been eating
+@dataclass
+class Customer:
+    name: str = field(default_factory=nextName)  # Random name from the list
+    location: Location = field(default=ENTRANCE)
+    waiting_time: int = field(default=0)
+    patience: int = field(default=15)  # Will leave unhappy after this many ticks
+    status: CustomerStatus = field(default=CustomerStatus.WAITING)  # waiting, seated, ordered, eating, done
+    order: List[OrderItem] = field(default_factory=lambda: ["burger"])  
+    eating_time: int = field(default=0)  # Tracks how long they've been eating
 
-    @computed_field
     @property # type: ignore
     def id(self) -> str:
-        return sha256(self.name.encode('utf-8')).hexdigest()
+        return self.name #sha256(self.name.encode('utf-8')).hexdigest()
 
     def to_prompt(self) -> str:
         return f"""

@@ -1,4 +1,5 @@
 
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Literal
 from uuid import uuid4
@@ -26,11 +27,12 @@ def getId():
     counter += 1
     return str(counter)
 
-class Order(BaseModel):
+@dataclass
+class Order:
     customer_id: str
-    id: str = Field(default_factory=lambda: getId())
     items: List[OrderItem]
-    status: OrderStatus = Field(default=OrderStatus.PENDING)
+    id: str = field(default_factory=lambda: getId())
+    status: OrderStatus = field(default=OrderStatus.PENDING)
 
     def to_prompt(self) -> str:
         return f"""

@@ -1,6 +1,6 @@
 from src.actions.hand_order_to_customer import HandOrderToCustomer, hand_food_to_customer
 from src.state.customer import Customer, CustomerStatus
-from src.state.employee import Employee
+from src.state.employee.employee import Employee
 from src.state.game import GameState
 from src.state.order import Order, OrderStatus
 

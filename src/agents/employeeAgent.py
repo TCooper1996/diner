@@ -1,4 +1,5 @@
 import asyncio
+import copy
 from dataclasses import dataclass
 import time
 from typing import Coroutine, Dict, List, Annotated, TypedDict, Callable, Any, Optional, Tuple
@@ -13,11 +14,10 @@ from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, BaseMe
 
 from src.agents.models.Model import Model, ResponseMessage, ToolInvocationMessage, ToolResultMessage
 from src.agents.observe import observe_environment
-from src.state.employee import Employee, EmployeeTurn
+from src.state.employee.EmployeeDecision import EmployeeDecision
+from src.state.employee.employee import Employee, EmployeeTurn
 from src.state.game import GameState
 from src.game_engine.location import Location
-from src.state.types import AgentDecision
-from src.utils.env import get_anthropic_api_key
 
 # Import actions from the new actions package
 from src.actions import *
@@ -144,18 +144,18 @@ class EmployeeAgentController:
         return await self.process_recursive(gameState, employeeId, 0)
 
     async def process_recursive(self, _gameState: GameState, employeeId: str, attempt: int) -> GameState:
-        gameState = _gameState.model_copy(deep=True)
-        state_message = HumanMessage(content=f"Your name is : {employeeId}. \nCurrent game state:\n{gameState.to_prompt()}")
+        gameState = copy.deepcopy(_gameState)
+        employee = gameState.grab_employee(employeeId)
+
+        response = await self.choose_next_action(gameState, employee)
         
-        employee = gameState.employees[employeeId]
-        response = await self.llm.invoke_cached(employee.instruction, state_message, employee.get_messages())
         # Update the employee's messages with the response
         action = parse_tool(response.tool_name, response.tool_args)
 
         # This is a copy, do not try to mutate the original employee or game state
         result = performAction(gameState, employee, action)
 
-        decision = AgentDecision(action=repr(action), 
+        decision = EmployeeDecision(action=action, 
                                  response=ResponseMessage(content=response.original_response.content),
                                  result=ToolResultMessage(tool=response.tool_name, tool_id= response.tool_id, tool_output=result.message, is_error=not result.success),
                                  invocation=ToolInvocationMessage(tool=response.tool_name, tool_input=response.tool_args, tool_id=response.tool_id),
@@ -166,15 +166,6 @@ class EmployeeAgentController:
         else:
             newEmployee.add_to_current_turn(decision)
 
-        with open("responses1.txt", "a") as f:
-            f.write(f"Turn: {gameState.tick}\n")
-            f.write(f"Attempt: {attempt}\n")
-            f.write(f"Employee: {employeeId}\n")
-            f.write(f"Prompt: {response.prompt}\n")
-            f.write(f"Response: {response.original_response.content}\n")
-            f.write(f"Action: {repr(action)}\n")
-            f.write(f"Result: {result.message}\n")
-            f.write("\n")
         
         if result.success:
             # Update the game state with the result
@@ -184,6 +175,11 @@ class EmployeeAgentController:
             return await self.process_recursive(result.game_state, employeeId, attempt + 1)
         else:
             raise Exception(f"Failed to process action for employee {employeeId} after 3 attempts")
+
+    async def choose_next_action(self, gameState: GameState, employee: Employee) -> LLMResult:
+        state_message = HumanMessage(content=f"Your name is : {employee.name}. \nCurrent game state:\n{gameState.to_prompt()}")
+        
+        return await self.llm.invoke_cached(employee.instruction, state_message, employee.get_messages())
 
 def performAction(gameState: GameState, employee: Employee, toolResult: EmployeeAction) -> ActionResult:
     match (toolResult):

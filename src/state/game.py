@@ -1,28 +1,28 @@
+from dataclasses import dataclass, field
 import json
 from typing import Dict, List, Optional, Tuple
 from enum import Enum
 
-from pydantic import BaseModel, Field
 from itertools import chain, cycle, groupby, zip_longest
 
-from src.state.employee import Employee
+from src.state.GameTurn import GameTurn
+from src.state.employee.employee import Employee
 from src.game_engine.location import *
 from src.state.customer import Customer
 from src.state.order import Order, OrderItem, OrderStatus
-from src.state.types import EmployeeTurn, GameTurn
 
-
-class GameState(BaseModel):
-    tick: int = Field(default=0)
-    customers: Dict[str, Customer] = Field(default_factory=dict)
-    orders: Dict[str, Order] = Field(default_factory=dict)
-    unhappy_customers: int = Field(default=0)
-    employees: Dict[str, Employee] = Field(default_factory=dict)
+@dataclass
+class GameState:
+    tick: int = field(default=0)
+    customers: Dict[str, Customer] = field(default_factory=dict)
+    orders: Dict[str, Order] = field(default_factory=dict)
+    unhappy_customers: int = field(default=0)
+    employees: Dict[str, Employee] = field(default_factory=dict)
     # relationships
     # maps each employee to the orders they are responsible for
-    order_takers: Dict[str, List[str]] = Field(default_factory=dict)
+    order_takers: Dict[str, List[str]] = field(default_factory=dict)
     # maps each employee to the orders they are currently carrying
-    order_carriers: Dict[str, List[str]] = Field(default_factory=dict)
+    order_carriers: Dict[str, List[str]] = field(default_factory=dict)
 
     def to_prompt(self) -> str:
         employees = [self.grab_employee(e) for e in self.employees]

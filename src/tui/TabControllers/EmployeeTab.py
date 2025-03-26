@@ -3,8 +3,8 @@ from textual.widgets import Markdown
 from rich.text import Text
 
 from src.agents.models.Model import *
-from src.state.employee import EmployeeTurn
-from src.state.types import AgentDecision
+from src.state.employee.EmployeeDecision import EmployeeDecision
+from src.state.employee.employee import EmployeeTurn
 
 string_type = Literal["Name", "Response", "ToolCall", "ToolResult"]
 
@@ -24,7 +24,7 @@ class EmployeeTab:
         content = Text.assemble(*lines)
         self.markdown.update(str(content))
 
-def format_attempt(attempt: AgentDecision, name: str) -> List[str | Tuple[str,str]]:
+def format_attempt(attempt: EmployeeDecision, name: str) -> List[str | Tuple[str,str]]:
     return [
     (f"Message: ", "bold green"),
     f"{attempt.response.content}  \n  ",

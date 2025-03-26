@@ -1,4 +1,5 @@
 import asyncio
+import copy
 from functools import reduce
 import time
 from typing import Dict, List, Tuple
@@ -10,13 +11,13 @@ from src.actions.base import ActionResult
 from src.agents.RefinementAgent import RefinementAgent
 from src.agents.models.Claude import Claude
 from src.game_engine.gameLogger import GameLogger
-from src.state.employee import Employee
+from src.state.employee.employee import Employee
 from src.agents.employeeAgent import EmployeeAgentController
 from rich.text import Text
 from src.game_engine.location import Location
 from src.state.customer import Customer
 from src.state.game import GameState
-from src.state.types import EmployeeTurn
+from src.state.employee.EmployeeTurn import EmployeeTurn
 from src.utils.async_reduce import async_reduce
 
 
@@ -69,7 +70,7 @@ class Game:
 
 
     def customer_update(self, _gamestate: GameState) -> GameState:
-        gamestate = _gamestate.model_copy(deep=True)
+        gamestate = copy.deepcopy(_gamestate)
         # Check win/loss conditions
         if gamestate.tick % 5 == 0 and len(gamestate.customers) < 3:  # Add new customer every 5 ticks
             c = Customer()
@@ -84,7 +85,7 @@ class Game:
         return gamestate
 
     async def employee_turn(self, _gamestate: GameState, name: str) -> GameState:
-        gamestate = _gamestate.model_copy(deep=True)
+        gamestate = copy.deepcopy(_gamestate)
         return await self.agent_controller.process(gamestate, name)
 
     

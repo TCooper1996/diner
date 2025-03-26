@@ -5,7 +5,7 @@ from langchain_core.tools import tool
 
 from src.actions.base import ActionResult
 from src.state.game import GameState
-from src.state.employee import Employee
+from src.state.employee.employee import Employee
 
 
 class WaitAction(BaseModel):

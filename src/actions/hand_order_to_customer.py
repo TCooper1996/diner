@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from src.actions.base import ActionResult, copy_args
 from src.state.customer import CustomerStatus
 from src.state.game import GameState, OrderStatus
-from src.state.employee import Employee
+from src.state.employee.employee import Employee
 
 
 class HandOrderToCustomer(BaseModel):

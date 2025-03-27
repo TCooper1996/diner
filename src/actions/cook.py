@@ -3,9 +3,10 @@
 from pydantic import Field, BaseModel
 from langchain_core.tools import tool
 
-from src.actions.base import ActionResult, copy_args
+from src.actions.base import ActionResult, ValidationResult, copy_args
 from src.state.game import GameState, OrderStatus
 from src.state.employee.employee import Employee
+from src.state.restaurant_state import RestaurantState
 
 
 
@@ -15,6 +16,14 @@ class CookAction(BaseModel):
     order_id: str = Field(
         description="The ID of the order to cook"
     )
+
+    def is_valid(self, employee: Employee, game_state: GameState) -> ValidationResult:
+        res = cook_food(employee, game_state, self)
+        return ValidationResult(res.success, res.message)
+
+    def execute(self, restaurant_state:RestaurantState, employee: Employee) -> ActionResult:
+        return cook_food(employee, restaurant_state, self)
+
 
 @copy_args
 def cook_food(employee: Employee, game_state: GameState, args: CookAction) -> ActionResult:

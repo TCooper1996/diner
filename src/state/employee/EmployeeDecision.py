@@ -15,6 +15,9 @@ class EmployeeDecision:
     result: ToolResultMessage
     action: IAction
 
+    @property
+    def was_valid(self) -> bool:
+        return self.result.is_error
 
     def get_action(self) -> IAction:
         return self.action
@@ -24,3 +27,6 @@ class EmployeeDecision:
     
     def get_response(self) -> str:
         return self.response.content
+
+    def get_messages(self):
+        return [self.response, self.invocation, self.result]

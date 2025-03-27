@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from src.agents.models.Model import ResponseMessage, StandardMessage, ToolInvocationMessage, ToolResultMessage
 from src.protocols import IAction
 from src.state.employee.EmployeeDecision import EmployeeDecision
+from src.state.restaurant_state import RestaurantState
 
 
 
@@ -18,7 +19,12 @@ class EmployeeTurn:
     """
     employee_name: str
     decisions: List[EmployeeDecision]
+    action_result_message: str
+    action: IAction
+    next_action: IAction
+    new_state: RestaurantState
 
-    def action(self) -> IAction:
-        return self.decisions[-1].action
+    def get_messages(self) -> List[StandardMessage]:
+        return [message for decision in self.decisions for message in decision.get_messages()]
+
 

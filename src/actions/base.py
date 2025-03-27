@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from src.game_engine.location import Location
 from src.state.game import GameState
+from src.state.restaurant_state import RestaurantState
 
 
 def copy_args(fn):
@@ -24,7 +25,12 @@ class ActionResult:
     message: str
     game_state: GameState
 
-    def __init__(self, success: bool, message: str, game_state: GameState):
-        self.success=success
+    def __init__(self, message: str, r_state: RestaurantState):
         self.message=message
-        self.game_state=game_state
+        self.r_state = r_state
+
+@dataclass
+class ValidationResult:
+    success: bool
+    error_msg: str | None
+

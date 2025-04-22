@@ -1,2 +1,1 @@
-from .App import *
-from .InterruptEmployeeScreen import *
+from .app import start

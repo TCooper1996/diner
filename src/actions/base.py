@@ -1,36 +1,25 @@
 """Base classes and utilities for actions"""
 
+from __future__ import annotations  # Enables string annotations
 import copy
 from dataclasses import dataclass
-from typing import Dict, List, Any, TYPE_CHECKING
-from pydantic import BaseModel, Field
 
-from src.game_engine.location import Location
-from src.state.game import GameState
-from src.state.restaurant_state import RestaurantState
+from src.common.position import Position
 
+# Removed ActionResult and ValidationResult import as they are not directly used here
 
 def copy_args(fn):
     def wrapper(*args, **kwargs):
+        import copy  # Local import to avoid circular dependency
         new_args = [copy.deepcopy(arg) for arg in args]
         return fn(*new_args, **kwargs)
     return wrapper
 
 @dataclass
-class ActionResult:
-    """
-    Result of an action, including success status, message, and updated game state
-    """
-    success: bool
-    message: str
-    game_state: GameState
+class Movement:
+    from_location: Position
+    current_location: Position
+    to_location: Position
 
-    def __init__(self, message: str, r_state: RestaurantState):
-        self.message=message
-        self.r_state = r_state
-
-@dataclass
-class ValidationResult:
-    success: bool
-    error_msg: str | None
-
+    def __str__(self):
+        return f"Move(from={self.from_location}, current={self.current_location}, to={self.to_location})"

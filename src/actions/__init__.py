@@ -8,18 +8,17 @@ Each action is contained in its own module and manages all aspects of that actio
 """
 
 from typing import Dict, Literal, Union
-from src.actions.move import *
-from src.actions.pick_up_order import *
-from src.actions.seat import *
-from src.actions.take_order import *
-from src.actions.notify_kitchen import *
-from src.actions.cook import *
-from src.actions.hand_order_to_customer import *
-from src.actions.wait import *
+from src.actions.move import MoveToNewRoom
+from src.actions.seat import SeatAction
+from src.actions.take_order import TakeOrderAction
+from src.actions.submit_orders_to_kitchen import SubmitOrdersToKitchen
+from src.actions.cook import CookAction
+from src.actions.deliver_order_to_customer import DeliverOrderToCustomer
+from src.actions.wait import WaitAction
+from src.actions.pick_up_order import PickUpOrder
 
 # List of all action tools available to the agent
 actionTypes = Literal[
-    "move",
     "seat",
     "takeOrder",
     "cook",
@@ -27,24 +26,22 @@ actionTypes = Literal[
     "wait",
     "submitOrdersToKitchen"
 ]
-EmployeeAction = Union[
-    MoveToNewRoom,
+Action = Union[
     SeatAction, 
     TakeOrderAction,
     SubmitOrdersToKitchen,
     CookAction,
-    HandOrderToCustomer,
+    DeliverOrderToCustomer,
     WaitAction,
     PickUpOrder
 ]
 
 tools = {
     t.__name__:t for t in
-    [MoveToNewRoom, 
-     SeatAction, 
+     [SeatAction, 
      TakeOrderAction,
      CookAction, 
-     HandOrderToCustomer, 
+     DeliverOrderToCustomer, 
      WaitAction, 
      SubmitOrdersToKitchen,
      PickUpOrder]
@@ -57,7 +54,7 @@ def create_tools():
     return list(tools.values())
 
 
-def parse_tool(name, args) -> EmployeeAction:
+def parse_tool(name, args) -> Action:
     """Parse a tool invocation into an EmployeeAction"""
     t = tools[name]
     return t(**args)

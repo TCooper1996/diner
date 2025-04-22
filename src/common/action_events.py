@@ -1,0 +1,2 @@
+class NoSeatAvailable():
+    pass

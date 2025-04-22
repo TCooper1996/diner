@@ -1,14 +1,12 @@
 """Take order action implementation"""
 
+from dataclasses import dataclass
 from typing import List
 from pydantic import BaseModel, Field
-from langchain_core.tools import tool
 
-from src.actions.base import ActionResult
-from src.state.customer import CustomerStatus
-from src.state.game import GameState, OrderStatus
-from src.state.employee.employee import Employee
-from src.state.order import Order, OrderItem
+from src.actions.EmployeeActionInteractor import EmployeeActionInteractor
+from src.common.results import ActionResult, ActionResult, ValidationResult  # Updated import
+from src.core.entities.customer import CustomerStatus
 
 
 class TakeOrderAction(BaseModel):
@@ -17,20 +15,17 @@ class TakeOrderAction(BaseModel):
     """
     customer_id: str = Field(..., description="The ID of the customer to take order from")
 
-def take_order(employee: Employee, game_state: GameState, args: TakeOrderAction) -> ActionResult:
-    if employee.location != "dining":
-        return ActionResult(False, f"{employee.name} cannot take orders from the {employee.location}. You need to be in the dining area.", game_state)
-    
-    # Find seated customers in the dining area
-    cust = game_state.get_customer(args.customer_id)
-    if not cust:
-        return ActionResult(False, f"Customer {args.customer_id} not found.", game_state)
+    def is_valid(self, itr: EmployeeActionInteractor) -> ValidationResult:
+        if not itr.customer_exists(self.customer_id):
+            return ValidationResult(False, f"Customer {self.customer_id} not found.")
+        
+        return ValidationResult(True, None)
 
-    # Use the extracted take_customer_order function
-    cust.status = CustomerStatus.ORDERED
-    items = cust.take_order()
-    order = Order(customer_id=cust.id, items=items, status=OrderStatus.PENDING)
-    game_state.orders[order.id] = order
-    game_state.assign_order_to_employee(employee.name, order.id)
-
-    return ActionResult(True, f"{employee.name} took an order from customer {cust.name} for {', '.join(items)}.", game_state)
+    def execute(self, itr: EmployeeActionInteractor) -> ActionResult:
+        reached = itr.approach_entity(itr.employee_name, self.customer_id)
+        if reached:
+            itr.set_customer_status(self.customer_id, CustomerStatus.ORDERED)  # Update the customer's status to ORDERED
+            order_id = itr.get_order_from_customer(self.customer_id)
+            return ActionResult(message=f"{itr.employee_name} took an order from customer {self.customer_id}", repeat=False)
+        else:
+            return ActionResult(message=f"{itr.employee_name} is moving toward customer: {self.customer_id} to take order.", repeat=True)

@@ -1,8 +1,7 @@
 from pydantic import BaseModel, Field
 
-from src.actions.base import ActionResult, copy_args
-from src.state.employee.employee import Employee
-from src.state.game import GameState
+from src.actions.EmployeeActionInteractor import EmployeeActionInteractor
+from src.common.results import ActionResult, ActionResult, ValidationResult  # Updated import
 
 
 class PickUpOrder(BaseModel):
@@ -13,24 +12,18 @@ class PickUpOrder(BaseModel):
     """
     order_id: str = Field(..., description="The ID of the order to pick up. Must be in the kitchen.")
 
+    def is_valid(self, itr: EmployeeActionInteractor) -> ValidationResult:
+        if itr.is_at_station("kitchen") is False:
+            return ValidationResult(False, f"{itr.employee_name} cannot pick up an order from the {itr.current_location()}. You must be in the kitchen.")
+        
+        if itr.order_exists(self.order_id) is False:
+            return ValidationResult(False, f"There is no order named {self.order_id}.")
+        
+        if self.order_id not in itr.get_ready_orders():
+            return ValidationResult(False, f"The order {self.order_id} is not ready for {itr.employee_name} to pick up.")
+        
+        return ValidationResult(True, None)
 
-@copy_args
-def pick_up_order(employee: Employee, game_state: GameState, args: PickUpOrder) -> ActionResult:
-    order_id = args.order_id
-    if employee.location != "kitchen":
-        return ActionResult(False, f"{employee.name} cannot pick up an order from the {employee.location}. You must be in the kitchen.", game_state)
-
-    # Find orders that are ready to be picked up
-    ready_orders = {order.id:order for order in game_state.get_ready_orders()}
-
-    if not ready_orders:
-        return ActionResult(False, f"There is no order ready for {employee.name} to pick up.", game_state)
-
-    # Check if the order is ready
-    if order_id not in ready_orders:
-        return ActionResult(False, f"The order {order_id} is not ready for {employee.name} to pick up.", game_state)
-
-    # Pick up the order
-    game_state.assign_order_to_employee_inventory(employee.name, order_id)
-
-    return ActionResult(True, f"{employee.name} picked up order {order_id}.", game_state)
+    def execute(self, itr: EmployeeActionInteractor) -> ActionResult:
+        itr.add_order_to_inventory(self.order_id)
+        return ActionResult(message=f"{itr.employee_name} picked up order {self.order_id}.")

@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import copy
 from dataclasses import dataclass
 import time
@@ -13,16 +14,8 @@ from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, BaseMessage, SystemMessage
 
 from src.agents.models.Model import Model, ResponseMessage, ToolInvocationMessage, ToolResultMessage
-from src.agents.observe import observe_environment
-from src.state.employee.EmployeeDecision import EmployeeDecision
-from src.state.employee.employee import Employee, EmployeeTurn
-from src.state.game import GameState
-from src.game_engine.location import Location
 
 # Import actions from the new actions package
-from src.actions import *
-from src.actions.base import ActionResult
-
 planning_template = """
 You are {name}, an employee at a diner. Your instructions are: '{instruction}'
 
@@ -57,6 +50,8 @@ class LLMResult:
     tool_id: str
     prompt: str
     original_response: ResponseMessage
+    game_state_prompt: str
+    messages: List[str]
 
     def to_dict(self) -> Dict[str, Any]:
         return self.__dict__
@@ -71,24 +66,25 @@ class LLM:
             temperature=0
         )
 
-    async def invoke_cached(self, prompt, state_message, messages) -> LLMResult:
+    async def invoke_cached(self, name, prompt, state_message, messages) -> LLMResult:
         # caching
         cache = {}
         if os.path.exists("responses.json"):
-            with open("responses.json", "rb") as f:
-                cache = pickle.load(f)
+            with open("responses.json", "r") as f:
+                d = f.read()
+                cache = json.loads(d)  # Load existing cache
         key = str({"prompt": prompt, "state_message": state_message, "messages": [repr(m) for m in messages]})
         if key in cache:
-            return cache[key]
-        response = await self.invoke(prompt, state_message, messages)
-        cache[key] = response
-        with open("responses.json", "wb") as f:
-            pickle.dump(cache, f)
+            return pickle.loads(base64.b64decode(cache[key]))
+        response = await self.invoke(name, prompt, state_message, messages)
+        cache[key] = base64.b64encode(pickle.dumps(response)).decode('utf-8')
+        with open("responses.json", "w") as f:
+            json.dump(cache, f)
         return response
 
-    async def invoke(self, prompt, state_message, _messages) -> LLMResult:
+    async def invoke(self, name, prompt, state_message, _messages) -> LLMResult:
         
-        system_message = SystemMessage(content=prompt)
+        system_message = SystemMessage(content=f"Instructions: {prompt}")
         messages = [*_messages]
 
         if len(messages) > 0:
@@ -98,8 +94,8 @@ class LLM:
                 messages.append(HumanMessage(content="Tool invocation successful"))
         
         # Explicit query at the end
-        human_message = HumanMessage(content="""
-        You must invoke exactly ONE tool provided to you.
+        human_message = HumanMessage(content=f"""
+        Provide a breif summary of your next action based on the current state of the restaurant and your instructions and then respond with the tool invocation.
     """)
 
         i = -1
@@ -108,8 +104,8 @@ class LLM:
             start = time.perf_counter()
             text, tool_call = await self.model.ainvoke([
                 system_message,
+                *messages,  # Limit to the last 5 messages for context
                 state_message,
-                *messages,
                 human_message
             ])
             end = time.perf_counter()
@@ -127,7 +123,9 @@ class LLM:
                 tool_args=tool_call.tool_input,
                 tool_id=tool_call.tool_id,
                 original_response=text,
-                prompt=prompt
+                prompt=prompt,
+                game_state_prompt=state_message.content,
+                messages=[repr(msg) for msg in messages] if messages else []
             )
             return result    
     

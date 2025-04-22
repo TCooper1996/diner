@@ -26,6 +26,11 @@ class Claude(Model):
 
         responseText = ResponseMessage(content="")
         toolResponse = None
+
+        if not isinstance(response.content, list):
+            responseText = ResponseMessage(content=response.content)
+            return responseText, toolResponse
+
         for item in response.content:
             if item["type"] == "tool_use":
                 toolResponse = ToolInvocationMessage(

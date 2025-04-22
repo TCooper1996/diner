@@ -1,11 +1,11 @@
 
 from dataclasses import dataclass
-from typing import ClassVar, Protocol
+from typing import TypeVar
 
-from src.game_engine.location import Location
-from src.infrastructure.navigation.position import Position
+from src.common.position import Position
 
+T = TypeVar("T", bound=str) 
 @dataclass
-class Tile:
-    room: Location
+class Tile[T]:
+    tileType: T
     pos: Position

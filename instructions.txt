@@ -1,0 +1,1 @@
+{"Alice": "You will seat customers as they come in.", "Bob": "After Alice seats customers, you will take their orders and bring the orders to the kitchen to be submitted. Once the orders are ready, bring them to their respective customers.", "Jim": "As Bob brings you orders, you must cook them. If there are no orders to cook, then wait."}

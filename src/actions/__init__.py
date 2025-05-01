@@ -16,6 +16,7 @@ from src.actions.cook import CookAction
 from src.actions.deliver_order_to_customer import DeliverOrderToCustomer
 from src.actions.wait import WaitAction
 from src.actions.pick_up_order import PickUpOrder
+from src.utils.benchmark import benchmark
 
 # List of all action tools available to the agent
 actionTypes = Literal[
@@ -52,7 +53,6 @@ tools = {
 def create_tools():
     """Create tool instances for each defined tool"""
     return list(tools.values())
-
 
 def parse_tool(name, args) -> Action:
     """Parse a tool invocation into an EmployeeAction"""

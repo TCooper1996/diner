@@ -2,6 +2,7 @@ import asyncio
 import base64
 import copy
 from dataclasses import dataclass
+import sys
 import time
 from typing import Coroutine, Dict, List, Annotated, TypedDict, Callable, Any, Optional, Tuple
 import os
@@ -13,7 +14,7 @@ from langchain_ollama import ChatOllama
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, BaseMessage, SystemMessage
 
-from src.agents.models.Model import Model, ResponseMessage, ToolInvocationMessage, ToolResultMessage
+from src.agents.models.Model import Model, ResponseMessage, StandardMessage, ToolInvocationMessage, ToolResultMessage
 
 # Import actions from the new actions package
 planning_template = """
@@ -56,6 +57,8 @@ class LLMResult:
     def to_dict(self) -> Dict[str, Any]:
         return self.__dict__
 
+
+cache = None
 class LLM:
     """LLM for the employee agent"""
     def __init__(self, model: Model):
@@ -66,28 +69,31 @@ class LLM:
             temperature=0
         )
 
-    async def invoke_cached(self, name, prompt, state_message, messages) -> LLMResult:
+    async def invoke_cached(self, prompt: str, state_message: str, messages: List[StandardMessage]) -> LLMResult:
         # caching
-        cache = {}
-        if os.path.exists("responses.json"):
-            with open("responses.json", "r") as f:
-                d = f.read()
-                cache = json.loads(d)  # Load existing cache
+        global cache
+        if cache is None:
+            if os.path.exists("responses.json"):
+                with open("responses.json", "r") as f:
+                    d = f.read()
+                    cache = json.loads(d)  # Load existing cache
+        
         key = str({"prompt": prompt, "state_message": state_message, "messages": [repr(m) for m in messages]})
         if key in cache:
             return pickle.loads(base64.b64decode(cache[key]))
-        response = await self.invoke(name, prompt, state_message, messages)
+        response = await self.invoke(prompt, state_message, messages)
         cache[key] = base64.b64encode(pickle.dumps(response)).decode('utf-8')
         with open("responses.json", "w") as f:
             json.dump(cache, f)
         return response
 
-    async def invoke(self, name, prompt, state_message, _messages) -> LLMResult:
+    async def invoke(self, prompt: str, _state_message: str, _messages: List[StandardMessage]) -> LLMResult:
         
         system_message = SystemMessage(content=f"Instructions: {prompt}")
+        state_message = HumanMessage(content=_state_message)
         messages = [*_messages]
 
-        if len(messages) > 0:
+        if len(messages) > 0 and isinstance(messages[-1], ToolMessage):
             if messages[-1].is_error:
                 messages.append(HumanMessage(content="Tool invocation failed: Your last action was invalid. Try again."))
             else:
@@ -95,7 +101,10 @@ class LLM:
         
         # Explicit query at the end
         human_message = HumanMessage(content=f"""
-        Provide a breif summary of your next action based on the current state of the restaurant and your instructions and then respond with the tool invocation.
+        Let's think step by step about your next action.
+        First, carefully consider your instructions and take note of the details of the current game state that are strictly related to your instructions.
+        Then, choose the most appropriate action based on the relevant details.
+
     """)
 
         i = -1

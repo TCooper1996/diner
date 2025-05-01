@@ -10,9 +10,9 @@ V = TypeVar("V")
 class EventManager[T, V]:
     in_q: Queue
     out_q: Queue
-    def get_event(self) -> T | None:
+    def get_event(self, block: bool=False) -> T | None:
         try:
-            return self.in_q.get( block=False)  # Non-blocking get
+            return self.in_q.get( block=block)  # Non-blocking get
         except Empty:
             return None
 

@@ -59,6 +59,13 @@ class EmployeeActionInteractor(Protocol):
         """
         ...
 
+    def get_orders_taken(self) -> list[str]:
+        """
+        Returns a list of order ids that the employee has taken from customers.
+        This includes orders that are in the process of being prepared or delivered.
+        """
+        ...
+
     def get_ready_orders(self) -> list[str]:
         ...
 

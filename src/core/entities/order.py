@@ -9,15 +9,15 @@ from pydantic import BaseModel, Field
 
 class OrderStatus(Enum):
     # Not yet taken to the kitchen
-    PENDING = "PENDING: Has been taken by a server but not yet submitted to the kitchen"
+    PENDING = "PENDING"
     # At the kitchen but not started cooking
-    SUBMITTED = "SUBMITTED: Has been taken to the kitchen but not yet started cooking."
+    SUBMITTED = "SUBMITTED"
     # Currently being cooked
-    COOKING = "COOKING: Is currently being cooked"
+    COOKING = "COOKING"
     # Ready to be delivered
-    READY = "READY: Is ready to be delivered"
+    READY = "READY"
     # Delivered to the customer
-    DELIVERED = "DELIVERED: delivered"
+    DELIVERED = "DELIVERED"
 
 OrderItem = Literal["burger", "fries", "salad", "pizza", "soda"]
 

@@ -82,6 +82,10 @@ class RestaurantState:
     def get_floors(self) -> List[Position]:
         return [f.pos for f in self.location_manager.floor_plan.get_tiles()]
 
+    def get_orders(self) -> List[Order]:
+        """Get all orders in the restaurant"""
+        return self.order_manager.get_orders()
+
     def orders_taken_by_employee(self, employee_name: str) -> List[str]:
         return self.order_takers.get(employee_name, [])
 

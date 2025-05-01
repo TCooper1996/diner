@@ -11,13 +11,12 @@ from src.agents.employeeAgent import LLM
 from src.agents.models.ChatGPT import GPT
 from src.agents.models.Claude import Claude
 from src.common.position import Position
-from src.controllers.employee_controller import EmployeeAgentController
+from src.game_engine.choose_employee_action import EmployeeAgentController
 
 from src.actions import *
 from src.core.types import TileType
 from src.infrastructure.navigation.floor_plan import FloorPlan
-from src.game_engine.employee_turn import add_employee_turn
-from src.state.game_state.game_state import GameState
+from src.game_engine.select_employee_action import add_employee_turn
 from src.state.game_state.immutable_types.employee_turn import EmployeeTurn
 from src.core.entities.customer import Customer, CustomerStatus
 from src.state.game_state.restaurant_state import add_customer, add_employee, initialize_entities
@@ -95,6 +94,9 @@ class TController:
         for employee in employees:
             turn = await self.process(employee)
             add_employee_turn(self.gamestate, turn)
+            failed = [d for d in turn.decisions if not d.was_valid]
+            if failed:
+                print(f"Failed to process action for employee {employee} after 3 attempts. Last decision: {failed[-1].get_response()}")
         self.gamestate.tick += 1  # Increment the game tick after processing all employees
 
 @pytest.mark.asyncio
@@ -126,14 +128,14 @@ class TestEmployeeAgent:
 
         # Turn 1
         await self.cont.one_turn(employees)
-        assert alice.last_action() == SeatAction(SeatAction( customer_id="C1"), Movement(from_location=Position(0, 0), current_location=Position(1, 0), to_location=Position(2, 0)))
+        assert alice.last_action() == SeatAction( customer_id="C1")
         assert bob.last_action() == WaitAction()
         assert jim.last_action() == WaitAction()
         
         # Turn 2
         # Customer reaches seat, so Alice's action resets to Wait
         await self.cont.one_turn(employees)
-        assert alice.last_action() == SeatAction(SeatAction(customer_id="C1"), Movement(from_location=Position(0, 0), current_location=Position(2, 0), to_location=Position(2, 0)))
+        assert alice.last_action() == SeatAction(customer_id="C1")
         ## Bob should be moving toward customer
         assert bob.last_action() == TakeOrderAction(customer_id="C1")
         assert bob.position == Position(1, 0), "Bob should be at the dining area where C1 is seated"

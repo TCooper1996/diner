@@ -6,9 +6,8 @@ from src.common.events.game_events import GameUpdateEvent
 from src.core.entities.info import EntityInfo
 
 
-class PauseCommandEffect():
+class PauseCommand():
     pass
-
 
 class ViewPreviousTickCommand():
     pass
@@ -16,35 +15,23 @@ class ViewPreviousTickCommand():
 class ViewNextTickCommand():
     pass
 
-
 @dataclass
 class ResizeCommand():
     width: int
     height: int
 
 @dataclass
+class QuitCommand():
+    pass
+
+@dataclass
+class RestartCommand():
+    pass
+
+@dataclass
 class GameUpdateCommand():
     game_update: GameUpdateEvent
 
-@dataclass
-class AppCommand:  
-    command:  ViewPreviousTickCommand | ViewNextTickCommand | ResizeCommand | GameUpdateCommand
-
-class QuitEffect():
-    pass
-
-class RestartEffect():
-    pass
-
-@dataclass
-class AppEffect():
-    effect: QuitEffect | RestartEffect
-
-@dataclass
-class AppCommandEffect():
-    command_effect: PauseCommandEffect
-
-
-AppIntent = AppEffect | AppCommand | AppCommandEffect
+AppCommand = ViewPreviousTickCommand | ViewNextTickCommand | ResizeCommand | GameUpdateCommand | QuitCommand | RestartCommand | PauseCommand
 
 

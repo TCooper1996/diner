@@ -1,6 +1,12 @@
 from dataclasses import dataclass
+from typing import TypedDict
 
-from src.common.events.game_events import TurnSummary
+
+class GuiTurnSummary(TypedDict):
+    entity_name: str
+    action: str
+    agent_response: str | None
+    action_result: str
 
 
 @dataclass
@@ -9,6 +15,6 @@ class GuiState:
     current_turn_num: int
     max_turn_num: int
     current_entity: str
-    messages: list[TurnSummary]
+    messages: list[GuiTurnSummary]
 
     

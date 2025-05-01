@@ -7,6 +7,7 @@ from langchain_core.tools import tool
 from src.actions.EmployeeActionInteractor import EmployeeActionInteractor
 from src.actions.base import copy_args
 from src.common.results import ActionResult, ActionResult, ValidationResult
+from src.core.entities.order import OrderStatus
 
 
 class SubmitOrdersToKitchen(BaseModel):
@@ -14,6 +15,10 @@ class SubmitOrdersToKitchen(BaseModel):
     Notify kitchen of new orders
     """
     def is_valid(self, itr: EmployeeActionInteractor) -> ValidationResult:
+        orders_taken = itr.get_orders_taken()
+        orders_to_submit = [itr.get_order_status(o) for o in orders_taken if itr.get_order_status(o) == OrderStatus.PENDING]
+        if len(orders_to_submit) == 0:
+            return ValidationResult(False, f"{itr.employee_name} has no pending orders to submit to the kitchen.")
         return ValidationResult(True, None)
         
 

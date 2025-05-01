@@ -2,7 +2,6 @@
 import pygame
 from src.common.event_manager import EventManager
 from src.common.events import GameEvent, GuiEvent
-from src.tui.app.process_gui_event import process_gui_event
 from src.tui.event_handling.handle_event import handle_app_event
 from src.tui.event_handling.types import AppEvent, AppGameEvent, AppPygameEvent
 from src.tui.app.window_state import WindowState

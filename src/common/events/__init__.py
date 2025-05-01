@@ -3,4 +3,4 @@ from .gui_events import *
 
 GuiEvent = Pause | ClearHistory | ResetGame | ChangeTurn
 
-GameEvent = GameUpdateEvent
+GameEvent = GameUpdateEvent | NewGameEvent

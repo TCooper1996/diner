@@ -1,7 +1,7 @@
 from typing import Literal, Tuple
 from src.actions import *
 from src.common.position import Position
-from src.controllers.employee_controller import EmployeeAgentController
+from src.game_engine.choose_employee_action import EmployeeAgentController
 from src.core.types import TileType
 from src.infrastructure.navigation.floor_plan import FloorPlan
 from src.protocols import IAction

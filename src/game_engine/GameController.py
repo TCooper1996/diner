@@ -1,104 +1,181 @@
-
 import asyncio
 import copy
+import datetime
+from email import message
 from itertools import chain
 import os
-from typing import Dict
-from src.actions import create_tools
-from src.agents.employeeAgent import LLM
+import functools
+from types import CoroutineType
+from typing import Any, Callable, Coroutine, Dict, Tuple
+from src.actions import *
+from src.agents.employeeAgent import LLM, LLMResult
 from src.agents.models.Claude import Claude
-from src.agents.models.Model import ResponseMessage
+from src.agents.models.Model import ResponseMessage, StandardMessage, ToolInvocationMessage, ToolResultMessage
 from src.common.event_manager import EventManager
 from src.common.events import *
 from src.common.events.game_events import  GameUpdateEvent
 from src.common.pause_manager import PauseManager
-from src.controllers.employee_controller import EmployeeAgentController
 from src.game_engine.IPauseManager import IPauseManager
 from src.game_engine.active_turn import ActiveTurn, EmployeeUpdate
-from src.game_engine.loop import LoopResult, loop
+from src.game_engine.GameTurnUsecase import CustomerTurn, EmployeeTurn, GameState, GameTurn, GameTurnUsecase, LoopResult, loop
+from src.game_engine.choose_employee_action import ChooseActionFromAgentUsecase
+from src.game_engine.run_employee_action import run_employee_action as run_employee_action_pure
+from src.game_engine.verify_employee_action import verify_employee_action
 from src.infrastructure.navigation.build_level import build_level
-from src.state import game_state
-from src.state.game_state.game_state import GameState
-from src.state.game_state.game_turn import GameTurn
-from src.state.game_state.immutable_types.employee_turn import EmployeeTurn
 from src.state.game_state.new_game_state import new_game_state
+from src.state.game_state.restaurant_state.restaurant_state import RestaurantState
+from src.state.game_state.view_all_entities import view_all_entities
+from langchain_core.messages import HumanMessage
 
 
+InvokeLLM = Callable[[str, str, List[StandardMessage]], Coroutine[Any, Any, LLMResult]]
 class GameController:
     def __init__(self, event_manager: EventManager[GuiEvent, GameEvent]):
-        self.employee_controller = EmployeeAgentController(LLM(Claude(create_tools())))
         self.event_manager = event_manager
         self.pause_manager = PauseManager()
-        self.instructions = {"Alice": "You will seat customers as they come in.", "Bob": "After Alice seats customers, you will take their orders and bring the orders to the kitchen to be submitted. Once the orders are ready, bring them to their respective customers.", "Jim": "As Bob brings you orders, you must cook them. If there are no orders to cook, then wait."}
+        cache = {}
+        async def invoke_llm(employee_name: str, state_message: str, extra_messages: List[StandardMessage]) -> LLMResult:
+            if employee_name in cache:
+                # If we have a cached LLM for this employee, use it
+                llm = cache[employee_name]
+            else:
+                llm = LLM(Claude(allowed_actions[employee_name]))
+                cache[employee_name] = llm
+            return await llm.invoke_cached(self.instructions[employee_name], HumanMessage(state_message), extra_messages)
+
+        self.invoke_llm: InvokeLLM = invoke_llm
+
+        # Create gameturnusecase
+
+        @dataclass
+        class GameTurnUsecaseImplementation:
+            agent_responses: List[Tuple[str, ResponseMessage, ToolInvocationMessage, ToolResultMessage, str | None]] = []
+            async def get_action_from_agent(self, employee: str, restaurant_state: RestaurantState) -> Action:
+                # Get Messages
+                messages: List[StandardMessage] = []
+                for employee_name, response, invocation, result, result_text in self.agent_responses:
+                    if employee == employee_name:
+                        messages.extend([response, invocation, result, HumanMessage(result_text)])
+                # Invoke LLM
+                #llm_result = await invoke_llm(employee, state_message, messages)
+                # store the logs
+                validation = await ChooseActionFromAgentUsecase(lambda messages: invoke_llm(employee, messages), lambda action: verify_employee_action(action, restaurant_state, employee)).execute()
+
+                for i, attempt in enumerate(validation):
+                    self.agent_responses.append((employee, attempt.text_response, attempt.tool_invocation, attempt.tool_result, attempt.validation_error))
+
+                return validation[-1].selected_action
+
+            def run_employee_action(self, restaurant_state: RestaurantState, employee: str, action: Action) -> Tuple[RestaurantState, Action | None]:
+                new_state, new_action, effect_text = run_employee_action_pure(restaurant_state, employee, action)
+                return new_state, new_action
+
+
+            async def execute(self, gamestate: GameState):
+                await GameTurnUsecase().execute(gamestate, self.get_action_from_agent, self.run_employee_action)
+                
+
+        GameTurnUsecase()
 
     @property
     def paused(self) -> bool:
         return self.pause_manager.is_paused()
 
     async def start_game_loop(self):
-        init_state = self.new_game()
-        current_state = LoopResult(init_state, EmployeeUpdate(0))
-        queued_update = None
+        # Immediately notify the GUI of the initial game state
+        reset_event = asyncio.Event()
+        reset_event.clear()
+        asyncio.create_task(self.handle_events(reset_event))
+        game_loop_task = self.dispatch_game_loop()
         while True:
-            current_state = self.handle_events(current_state)
-
-            if not self.paused:
-                if queued_update is not None:
-                    self.update_gui(queued_update)
-                    queued_update = None
-                current_state = await self.loop(current_state.gameState, current_state.nextTurn)
-                queued_update = current_state.gameState
+            await reset_event.wait()
+            game_loop_task.cancel()
+            game_loop_task = self.dispatch_game_loop()
+            reset_event.clear()
             await asyncio.sleep(0.1)
 
-    def new_game(self):
-        floor_plan = build_level("src/assets/levels/level1.txt")
-        return new_game_state(self.instructions, floor_plan)
-
-    async def loop(self, prev_state: GameState, turn: ActiveTurn) -> LoopResult:
-        return await loop(turn, prev_state, self.employee_controller)
+    def dispatch_game_loop(self) -> asyncio.Task:
+        return asyncio.create_task(game_control_loop(self.pause_manager, self.instructions, self.invoke_llm, self.event_manager))
 
 
 
-    def handle_events(self, current_state: LoopResult):
-        e = self.event_manager.get_event()
-        if e is None:
-            return current_state
+    async def handle_events(self, cancel_event: asyncio.Event):
+        while True:
+            await asyncio.sleep(0.1)  # Polling interval for events
+            e = self.event_manager.get_event()
 
-        match e:
-            case ResetGame():
-                if os.path.exists("responses.json"):
-                    os.remove("responses.json")
-                print("Reset history")
-                return LoopResult(self.new_game(), EmployeeUpdate(0))
+            match e:
+                case ResetGame():
+                    if os.path.exists("responses.json"):
+                        os.remove("responses.json")
+                    print("Reset history")
+                    cancel_event.set()
 
-            case Pause():
+                case Pause():
+                    self.pause_manager.toggle()
+                    print(f"Paused: {self.paused}")
 
-                self.pause_manager.toggle()
-                print(f"Paused: {self.paused}")
-                return current_state
+                case None:
+                    pass
 
-            case _:
-                raise ValueError(f"Unhandled event type: {type(e)}")
+                case _:
+                    raise ValueError(f"Unhandled event type: {type(e)}")
 
-    def update_gui(self, state: GameState):
-        last_turn = state.last_game_turn()
-        if last_turn is None:
-            raise ValueError("No entity found for the last turn")
-        employee_turn = last_turn.employees[-1] 
-        turn_history = get_turns(state.get_game_turns())
-        event = GameUpdateEvent(game_state.view_all_entities(state), 
-                                turn_history,
-                                last_turn.employees[-1].employee_name, 
-                                state.tick, 
-                                repr(employee_turn.action),
-                                employee_turn.response,
-                                employee_turn.action_result_message,
-        )
-        self.event_manager.put_event(event)
+def update_gui(state: GameState, event_manager: EventManager):
+    last_turn = state.turns[-1] if state.turns else None
+
+    match last_turn:
+        case None:
+            event_manager.put_event(NewGameEvent(GameUpdateEvent(view_all_entities(state), [], "No entity",
+                                    state.tick
+                                                                )))
+        case EmployeeTurn(name, attempts):
+            turn_history = get_turns(state.turns)
+            event_manager.put_event(GameUpdateEvent(view_all_entities(state), 
+                                    turn_history,
+                                    name,
+                                    state.tick, 
+            ))
+        case CustomerTurn():
+            turn_history = get_turns(state.turns)
+            event_manager.put_event(GameUpdateEvent(view_all_entities(state), 
+                                    turn_history,
+                                    "custo",
+                                    state.tick, 
+            ))
 
 
 def get_turns(turns: List[GameTurn]) -> List[TurnSummary]:
-    return [get_turn_info(i, turn) for i, turn in enumerate(chain.from_iterable(t.employees for t in turns))]
+    return [get_turn_info(i, turn) for i, turn in enumerate(t for t in turns)]
 
-def get_turn_info(num: int, e: EmployeeTurn) -> TurnSummary:
-    return TurnSummary(num, e.employee_name, repr(e.action), e.response, e.action_result_message)
+def get_turn_info(num: int, e: GameTurn) -> TurnSummary:
+    match e:
+        case EmployeeTurn(employee_name, attempts, action_result_message):
+            return TurnSummary(num, employee_name, repr(e.get_action()), e.get_response() or "no response", action_result_message)
+        case CustomerTurn():
+            return TurnSummary(num, "customer name", "customer action", "customer response", "customer action result message")
+        case _:
+            raise ValueError(f"Unknown turn type: {type(e)}")
+
+
+# Each invocation is one new game
+async def game_control_loop(pause_event: PauseManager, instructions: Dict[str,str], invoke_llm: InvokeLLM, event_manager: EventManager):
+    try:
+        init_state = new_game(instructions)
+        current_state = init_state
+        update_gui(init_state, event_manager)
+        while True:
+            if not pause_event.is_paused():
+                GameTurnUsecase()
+                current_state = await loop(current_state.nextTurn, current_state.gameState, invoke_llm)
+                if not pause_event.is_paused():
+                    update_gui(current_state.gameState, event_manager)
+            await asyncio.sleep(0.1)
+    except asyncio.CancelledError:
+        print("Game loop cancelled.")
+
+
+
+def new_game(instructions: Dict[str,str]):
+    floor_plan = build_level("src/assets/levels/level1.txt")
+    return new_game_state(instructions, floor_plan)

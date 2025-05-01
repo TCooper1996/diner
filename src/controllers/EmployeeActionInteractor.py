@@ -30,10 +30,13 @@ class EmployeeActionInteractor(IEmployeeActionInteractor):
     def find_nearest_station(self, station_type, entity_id):
         return closest_station(entity_id, self.station_manager, self.location_manager, station_type)
 
-    def submit_orders(self):
+    def submit_orders(self) -> int:
         orders: List[str] = self.restaurant_state.orders_taken_by_employee(self.employee_name)
+        submitted = 0
         for o in orders:
+            submitted += 1
             self.set_order_status(o, OrderStatus.SUBMITTED)  # Update the order status in the restaurant state
+        return submitted
 
     def add_order_to_inventory(self, order_id):
         orders = self.restaurant_state.order_carriers.get(self.employee_name, [])
@@ -59,6 +62,9 @@ class EmployeeActionInteractor(IEmployeeActionInteractor):
 
     def get_orders_carried(self) -> list[str]:
         return self.restaurant_state.orders_carried_by_employee(self.employee_name)  # Get the list of orders carried by the employee
+
+    def get_orders_taken(self) -> list[str]:
+        return self.restaurant_state.orders_taken_by_employee(self.employee_name)  # Get the list of orders taken by the employee
 
     def get_ready_orders(self) -> List[str]:
         return [o.id for o in self.restaurant_state.order_manager.get_ready_orders()]  # Get a list of order IDs that are ready

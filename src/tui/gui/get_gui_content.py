@@ -5,6 +5,7 @@ from src.tui.gui.ui_manager import UIManager
 from src.tui.gui.widgets import *
 from src.tui.gui.widgets.rect import Rect
 from src.tui.gui.widgets.stack.stack import stack
+from src.utils.benchmark import benchmark
 
 @dataclass
 class WidgetRects:
@@ -37,5 +38,14 @@ def build_pause_label(state: GuiState) -> PauseLabel:
     return PauseLabel("Paused" if state.paused else "Running")
 
 def build_message_box(state: GuiState) -> MessageBox:
-    messages = list(map(lambda m: "\n".join([repr(m) for m in  (m.action, m.response, m.result)]), state.messages))
+    messages = []
+    if state.messages:
+        turn_summary = state.messages[-1]
+        block = []
+        block.append(f"<b>Turn: {turn_summary['entity_name']}</b>")
+        block.append(f"<strong>Action</strong>: {turn_summary['action']}")
+        if turn_summary['agent_response']:
+            block.append(f"<strong>Agent Response</strong>: {turn_summary['agent_response'].rstrip()}")
+        block.append(f"<strong>Result</strong>: {turn_summary['action_result']}")
+        messages.append("\n".join(block) + "\n")
     return MessageBox(messages)

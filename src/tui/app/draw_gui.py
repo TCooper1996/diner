@@ -7,6 +7,8 @@ import pygame_gui
 from src.tui.gui.widgets.rect import Rect
 from pygame_gui.core import UIElement
 
+from src.utils.benchmark import benchmark, print_time_since
+
 
 @dataclass
 class DrawGuiInput:
@@ -25,7 +27,9 @@ class WidgetState:
 
 delta_cache: Dict[str, WidgetState] = {}
 
+@benchmark
 def draw_gui(input_data: DrawGuiInput, update_func):
+    print_time_since("draw_gui")
     widget_ids = list(input_data.widgets.keys())
     for widget_id in widget_ids:
         widget = input_data.widgets[widget_id]
@@ -42,6 +46,7 @@ def draw_gui(input_data: DrawGuiInput, update_func):
 
         old_state = delta_cache.get(widget_id, None)
         # If the widget is not in the cache, or if the state has changed, update it
+        print_time_since("draw_gui : before cache ")
         if old_state is None or old_state != current_state:
             delta_cache[widget_id] = current_state
 
@@ -54,8 +59,14 @@ def draw_gui(input_data: DrawGuiInput, update_func):
                     widget.set_text(content)
                     widget.rebuild()
                 case pygame_gui.elements.UITextBox():
+                    print_time_since("draw_gui : before rebuild ")
                     widget.set_text(content)
+                    print_time_since("draw_gui : after set")
                     widget.rebuild()
+                    print_time_since("draw_gui : after rebuild ")
         
+        print_time_since("draw_gui : after cache ")
     update_func()
+
+    print_time_since("draw_gui : after update func ")
 

@@ -5,9 +5,10 @@ import pygame
 
 from src.tui.emojis.emojis import EmojiResource
 
+EmojiFilepath = Path
 
 @functools.cache
-def get_emoji_image( asset_dir: Path, emoji: EmojiResource) -> pygame.Surface:
+def get_emoji_image( asset_dir: Path, emoji: EmojiResource) -> EmojiFilepath:
     """Load and return the image for a given emoji, caching it if necessary."""
 
     # Load the image
@@ -15,9 +16,7 @@ def get_emoji_image( asset_dir: Path, emoji: EmojiResource) -> pygame.Surface:
     file = resolve_openmoji_filename(emoji, str(asset_dir))
     if file is None:
         raise FileNotFoundError(f"Emoji file not found for {emoji}")
-    image = pygame.image.load(asset_dir / file).convert_alpha()
-
-    return image
+    return asset_dir / file
 
 import os
 

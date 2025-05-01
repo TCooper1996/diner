@@ -4,8 +4,9 @@ import pygame
 from src.common.event_manager import EventManager
 from src.common.events import GameEvent, GuiEvent
 from src.tui import canvas
+from src.tui.app.game_restart_loop import game_restart_loop
 from src.tui.app.loop import loop
-from src.tui.app.window_state import GameSnapshot, WindowState
+from src.tui.app.window_state import WindowGameSnapshot, WindowState
 from src.tui.canvas.canvas_state import CanvasState
 from src.tui.gui.gui_state import GuiState
 from src.tui.gui.make_gui import make_gui
@@ -20,7 +21,5 @@ def start(event_manager: EventManager[GameEvent, GuiEvent]):
     surface = pygame.display.set_mode((width, height), pygame.RESIZABLE)
     manager = make_gui(width, height)
 
-    initial_snapshot = GameSnapshot([], [], -1, "Turn hasn't started", "", "", "")
-    state = WindowState(False, 0, width, height, initial_snapshot, [])
-    loop(state, event_manager, manager, surface)
+    game_restart_loop(event_manager, manager, surface)
     pygame.quit()

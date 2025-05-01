@@ -1,2 +1,2 @@
-from .get_emoji import get_emoji
 
+from .get_emoji import *

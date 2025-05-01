@@ -5,7 +5,11 @@ from dataclasses import dataclass
 class FPosition:
     x: float
     y: float
-    
+
+    @classmethod
+    def from_position(cls, position: 'Position') -> 'FPosition':
+        return cls(float(position.x), float(position.y))
+
 
 @dataclass
 class Position:

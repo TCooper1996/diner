@@ -31,11 +31,15 @@ class CookAction(BaseModel):
         if kitchen_id is None:
             kitchen_id = itr.find_nearest_station("kitchen", itr.employee_name)
             itr.lock_station(kitchen_id, itr.employee_name)
-        
-        done = itr.cook_order(self.order_id)
-        if done:
-            itr.set_order_status(self.order_id, OrderStatus.READY)
-            return ActionResult(f"{itr.employee_name} prepared order #{self.order_id}.", repeat=False)
+
+        if itr.entity_reached_entity(itr.employee_name, kitchen_id):
+            done = itr.cook_order(self.order_id)
+            if done:
+                itr.set_order_status(self.order_id, OrderStatus.READY)
+                return ActionResult(f"{itr.employee_name} prepared order #{self.order_id}.", repeat=False)
+            else:
+                return ActionResult(f"{itr.employee_name} is cooking order #{self.order_id}.", repeat=True)
         else:
-            return ActionResult(f"{itr.employee_name} is cooking order #{self.order_id}.", repeat=True)
+            itr.approach_entity(itr.employee_name, kitchen_id)
+            return ActionResult(f"{itr.employee_name} is moving toward the kitchen at {kitchen_id} to cook order #{self.order_id}.", repeat=True)
 

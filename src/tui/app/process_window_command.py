@@ -1,6 +1,6 @@
 
 from src.tui.app.intent import *
-from src.tui.app.window_state import GameSnapshot, WindowState
+from src.tui.app.window_state import WindowGameSnapshot, WindowState
 
 
 def process_window_command(state: WindowState, command: AppCommand) -> WindowState:
@@ -9,7 +9,7 @@ def process_window_command(state: WindowState, command: AppCommand) -> WindowSta
         case GameUpdateCommand(GameUpdateEvent(entities, turn_history, name_of_turn_entity, turn_number, action, agent_response, response_result)):
             current_turn = state.max_turn_num + 1 if latest_turn_focused(state) else state.current_turn_num
             return state.update(
-                game_snapshots=[*state.game_snapshots, GameSnapshot(entities, turn_history, turn_number, name_of_turn_entity, action, agent_response, response_result)],
+                game_snapshots=[*state.game_snapshots, WindowGameSnapshot(entities, turn_history, turn_number, name_of_turn_entity, action, agent_response, response_result)],
                 current_turn_num=current_turn,
             )
         case ResizeCommand(width, height):

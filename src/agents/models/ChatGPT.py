@@ -13,7 +13,7 @@ from src.utils.env import get_anthropic_api_key
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, BaseMessage, SystemMessage
 
 
-class GPT(Model):
+class ChatGPT(Model):
     def __init__(self, tools: List):
         self.tools = [self.to_tool_schema(tool) for tool in tools]
         load_dotenv()
@@ -42,7 +42,7 @@ class GPT(Model):
     async def ainvoke(self, _messages: List[StandardMessage]) -> Tuple[ResponseMessage, Optional[ToolInvocationMessage]]:
         messages = self.to_messages(_messages)
 
-        response = self.client.chat.completions.create(model="o1", messages=messages, tools=self.tools)
+        response = self.client.chat.completions.create(model="o4-mini", messages=messages, tools=self.tools)
 
         if response.choices[0].message.tool_calls is None:
             return ResponseMessage(content=""), None

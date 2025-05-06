@@ -10,8 +10,6 @@ import json
 import pickle
 
 from dotenv import load_dotenv
-from langchain_ollama import ChatOllama
-from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, BaseMessage, SystemMessage
 
 from src.agents.models.Model import Model, ResponseMessage, StandardMessage, ToolInvocationMessage, ToolResultMessage
@@ -58,21 +56,16 @@ class LLMResult:
         return self.__dict__
 
 
-cache = None
+cache: Dict[str, str] = {}
 class LLM:
     """LLM for the employee agent"""
     def __init__(self, model: Model):
         self.model = model
-        # Setup the LLM
-        llamaLLM = ChatOllama(
-            model="mistral",
-            temperature=0
-        )
 
     async def invoke_cached(self, prompt: str, state_message: str, messages: List[StandardMessage]) -> LLMResult:
         # caching
         global cache
-        if cache is None:
+        if len(cache) == 0:
             if os.path.exists("responses.json"):
                 with open("responses.json", "r") as f:
                     d = f.read()
@@ -133,7 +126,7 @@ class LLM:
                 tool_id=tool_call.tool_id,
                 original_response=text,
                 prompt=prompt,
-                game_state_prompt=state_message.content,
+                game_state_prompt=_state_message,
                 messages=[repr(msg) for msg in messages] if messages else []
             )
             return result    

@@ -1,19 +1,12 @@
+import ctypes.util
+import os
+import sys
 
-unused_faces = "🧛, 🧙, 🦹, 👩, 👮, 🫅🏼, 🕵️, 👨".replace(" ", "").split(",")
-from wcwidth import wcswidth
-import unicodedata
+print("PYTHON EXECUTABLE:", sys.executable)
+print("ENVIRONMENT PATH:")
+print(os.environ.get("PATH", ""))
+print("DYLD_LIBRARY_PATH:", os.environ.get("DYLD_LIBRARY_PATH"))
+print("PKG_CONFIG_PATH:", os.environ.get("PKG_CONFIG_PATH"))
 
-
-key_map = list({
-	"floor": "⬜",
-	"kitchen": "🖥️",
-	"dining": "🪑",
-	"entrance": "🚪"
-}.values())
-vals = unused_faces + key_map + ["📺", "🧑‍⚖️", "🤰"]
-
-for e in vals:
-	width = wcswidth(e)
-	name = unicodedata.name(e[0], 'UNKNOWN')
-	visual = f"|{e}|"
-	print(f"{visual:<6} wcwidth: {width:<2} {name}")
+print("\nFinding Cairo using ctypes.util.find_library:")
+print("Result:", ctypes.util.find_library("cairo"))

@@ -6,7 +6,7 @@ from itertools import chain
 import os
 import functools
 from types import CoroutineType
-from typing import Any, Callable, Coroutine, Dict, Tuple
+from typing import Any, Callable, Coroutine, Dict, Tuple, TypedDict
 from src.actions import *
 from src.agents.employeeAgent import LLM, LLMResult
 from src.agents.models.Claude import Claude
@@ -16,17 +16,13 @@ from src.common.events import *
 from src.common.events.game_events import  GameUpdateEvent
 from src.common.pause_manager import PauseManager
 from src.game_engine.IPauseManager import IPauseManager
-from src.game_engine.active_turn import ActiveTurn, EmployeeUpdate
-from src.game_engine.GameTurnUsecase import CustomerTurn, EmployeeTurn, GameState, GameTurn, GameTurnUsecase, LoopResult, loop
-from src.game_engine.choose_employee_action import ChooseActionFromAgentUsecase
-from src.game_engine.run_employee_action import run_employee_action as run_employee_action_pure
+from src.application.game_loop import CustomerTurn
 from src.game_engine.verify_employee_action import verify_employee_action
 from src.infrastructure.navigation.build_level import build_level
-from src.state.game_state.new_game_state import new_game_state
-from src.state.game_state.restaurant_state.restaurant_state import RestaurantState
-from src.state.game_state.view_all_entities import view_all_entities
 from langchain_core.messages import HumanMessage
 
+class GameControllerDependencies(TypedDict):
+    invoke_llm: Callable[[str, str, List[StandardMessage]], Coroutine[Any, Any, LLMResult]]
 
 InvokeLLM = Callable[[str, str, List[StandardMessage]], Coroutine[Any, Any, LLMResult]]
 class GameController:
@@ -45,37 +41,6 @@ class GameController:
 
         self.invoke_llm: InvokeLLM = invoke_llm
 
-        # Create gameturnusecase
-
-        @dataclass
-        class GameTurnUsecaseImplementation:
-            agent_responses: List[Tuple[str, ResponseMessage, ToolInvocationMessage, ToolResultMessage, str | None]] = []
-            async def get_action_from_agent(self, employee: str, restaurant_state: RestaurantState) -> Action:
-                # Get Messages
-                messages: List[StandardMessage] = []
-                for employee_name, response, invocation, result, result_text in self.agent_responses:
-                    if employee == employee_name:
-                        messages.extend([response, invocation, result, HumanMessage(result_text)])
-                # Invoke LLM
-                #llm_result = await invoke_llm(employee, state_message, messages)
-                # store the logs
-                validation = await ChooseActionFromAgentUsecase(lambda messages: invoke_llm(employee, messages), lambda action: verify_employee_action(action, restaurant_state, employee)).execute()
-
-                for i, attempt in enumerate(validation):
-                    self.agent_responses.append((employee, attempt.text_response, attempt.tool_invocation, attempt.tool_result, attempt.validation_error))
-
-                return validation[-1].selected_action
-
-            def run_employee_action(self, restaurant_state: RestaurantState, employee: str, action: Action) -> Tuple[RestaurantState, Action | None]:
-                new_state, new_action, effect_text = run_employee_action_pure(restaurant_state, employee, action)
-                return new_state, new_action
-
-
-            async def execute(self, gamestate: GameState):
-                await GameTurnUsecase().execute(gamestate, self.get_action_from_agent, self.run_employee_action)
-                
-
-        GameTurnUsecase()
 
     @property
     def paused(self) -> bool:
@@ -86,16 +51,14 @@ class GameController:
         reset_event = asyncio.Event()
         reset_event.clear()
         asyncio.create_task(self.handle_events(reset_event))
-        game_loop_task = self.dispatch_game_loop()
+        create_game_loop = lambda: asyncio.create_task(game_control_loop(self.pause_manager, self.instructions, self.invoke_llm, self.event_manager))
         while True:
+            game_loop_task = create_game_loop()
             await reset_event.wait()
             game_loop_task.cancel()
-            game_loop_task = self.dispatch_game_loop()
             reset_event.clear()
             await asyncio.sleep(0.1)
 
-    def dispatch_game_loop(self) -> asyncio.Task:
-        return asyncio.create_task(game_control_loop(self.pause_manager, self.instructions, self.invoke_llm, self.event_manager))
 
 
 
@@ -121,7 +84,7 @@ class GameController:
                 case _:
                     raise ValueError(f"Unhandled event type: {type(e)}")
 
-def update_gui(state: GameState, event_manager: EventManager):
+def update_gui(state: GameLoopState, event_manager: EventManager):
     last_turn = state.turns[-1] if state.turns else None
 
     match last_turn:

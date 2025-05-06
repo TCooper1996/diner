@@ -29,7 +29,6 @@ def getId():
 
 @dataclass
 class Order:
-    customer_id: str
     id: str = field(default_factory=lambda: getId())
     status: OrderStatus = field(default=OrderStatus.PENDING)
 

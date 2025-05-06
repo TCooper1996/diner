@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Optional
 
+from src.common.position import Position
+
 def not_implemented_error():
     raise NotImplementedError("This method is not implemented in the current context. Please override it in the subclass or provide an implementation.")
 
@@ -35,11 +37,13 @@ class CustomerStatus(Enum):
 
 @dataclass
 class Customer:
+    position: Position
     name: str = field(default_factory=nextName)  # Random name from the list
     waiting_time: int = field(default=0)
     patience: int = field(default=50)  # Will leave unhappy after this many ticks
     status: CustomerStatus = field(default=CustomerStatus.WAITING)  # waiting, seated, ordered, eating, done
     eating_time: int = field(default=0)  # Tracks how long they've been eating
+    received_order: bool = field(default=False)
 
     @property # type: ignore
     def id(self) -> str:

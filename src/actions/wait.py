@@ -3,8 +3,8 @@
 from pydantic import BaseModel, Field
 from langchain_core.tools import tool
 
-from src.actions.EmployeeActionInteractor import EmployeeActionInteractor
-from src.common.results import ActionResult, ActionResult, ValidationResult
+from src.core.models.Action import ActionResult, ValidationResult
+from src.core.models.RestaurantState import RestaurantState
 
 
 class WaitAction(BaseModel):
@@ -12,10 +12,10 @@ class WaitAction(BaseModel):
     Tool for waiting (taking no action)
     """
 
-    def is_valid(self, itr: EmployeeActionInteractor) -> ValidationResult:
+    def is_valid(self, state: RestaurantState, employee_id: str) -> ValidationResult:
         return ValidationResult(True, None)
 
-    def execute(self, itr: EmployeeActionInteractor) -> ActionResult:
-        return ActionResult(f"{itr.employee_name} is waiting for the next instruction.")
+    def execute(self, state: RestaurantState, employee_id: str) -> ActionResult:
+        return ActionResult(f"{employee_id} is waiting for the next instruction.", repeat=False)
     
 

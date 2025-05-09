@@ -9,26 +9,44 @@ an application service that orchestrates the game loop and UI interactions.
 import asyncio
 import threading
 from queue import Queue
-from typing import Any
+from typing import Any, List
 
 from src.actions import *
 from src.application.coordinator.game_ui_coordinator import GameUICoordinator
-from src.application.services.AgentService import AgentService
+from src.application.implementations.models.GameStateImpl import GameStateImpl
+from src.application.implementations.services.NavigationServiceImpl import NavigationServiceImpl
+from src.application.services.AgentService import AgentServiceImpl
 from src.common.event_manager import EventManager
 from src.common.events import GameEvent, GuiEvent
+from src.core.models.ActiveTurn import EmployeeUpdate
+from src.infrastructure.navigation.build_level import build_level
 from src.tui import start as start_tui
 
 
-async def start_coordinator(event_manager: EventManager[GuiEvent, GameEvent], agent_service: AgentService):
+
+async def start_coordinator(event_manager: EventManager[GuiEvent, GameEvent], agent_service: AgentServiceImpl, nav_service: NavigationServiceImpl, employee_ordering: List[str]):
     """
     Start the game-UI coordinator.
     
     """
+    def game_state_factory() -> GameStateImpl:
+        """
+        Factory function to create a new game state.
+        
+        Returns:
+            A new instance of GameStateImpl.
+        """
+        return GameStateImpl(
+            nav_service,
+            agent_service,
+            EmployeeUpdate(employee_ordering[0])
+        )
     
     # Create and start coordinator
     coordinator = GameUICoordinator(
-        agent_service=agent_service,
-        event_manager=event_manager
+        event_manager=event_manager,
+        game_state_factory=game_state_factory,
+        employee_ordering=employee_ordering,
     )
     
     # Start and await coordinator
@@ -56,11 +74,15 @@ def main():
         "Bob": [WaitAction, TakeOrderAction, SubmitOrdersToKitchen, PickUpOrder, DeliverOrderToCustomer],
         "Jim": [WaitAction, CookAction]
     }
+    level_file = "src/infrastructure/navigation/assets/level_1.txt"
 
-    agent_service = AgentService(
+    agent_service = AgentServiceImpl(
         instructions,
         allowed_actions,
     )
+
+    navigation_service = NavigationServiceImpl(build_level(level_file))
+
     # Create queues for bi-directional communication
     game_to_ui_queue = Queue()
     ui_to_game_queue = Queue()
@@ -77,7 +99,7 @@ def main():
     ui_thread.start()
     
     # Start game coordinator in main thread
-    asyncio.run(start_coordinator(game_event_manager, agent_service))
+    asyncio.run(start_coordinator(game_event_manager, agent_service, navigation_service, list(instructions.keys())))
 
 
 if __name__ == "__main__":

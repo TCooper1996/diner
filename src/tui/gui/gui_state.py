@@ -1,9 +1,9 @@
 from dataclasses import dataclass
-from typing import TypedDict
+from typing import List, Protocol, TypedDict
 
 
-class GuiTurnSummary(TypedDict):
-    entity_name: str
+@dataclass
+class GuiTurnSummary:
     action: str
     agent_response: str | None
     action_result: str
@@ -15,6 +15,6 @@ class GuiState:
     current_turn_num: int
     max_turn_num: int
     current_entity: str
-    messages: list[GuiTurnSummary]
+    messages: List[str]
 
     

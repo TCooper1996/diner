@@ -30,14 +30,14 @@ class DeliverOrderToCustomer(BaseModel):
         
         if reached_customer(state, employee_id, self.customer_id):
             # Update order status
-            order = state.get_order_repo().get_order(self.order_id)
+            order = state.get_order(self.order_id)
             order.status = OrderStatus.DELIVERED
-            state.get_order_repo().update_order(order)
+            state.update_order(order)
             
             # Update customer status
-            customer = state.get_customer_repo().get_customer(self.customer_id)
+            customer = state.get_customer(self.customer_id)
             customer.status = CustomerStatus.EATING
-            state.get_customer_repo().update_customer(customer)
+            state.update_customer(customer)
             
             return ActionResult(f"{employee_id} delivered order #{self.order_id} to customer {self.customer_id}. The customer is now eating.", repeat=False)
         else:
@@ -47,23 +47,23 @@ class DeliverOrderToCustomer(BaseModel):
 # Utilities --------------------------------
 def has_order_in_inventory(state: RestaurantState, employee_id: str, order_id: str) -> bool:
     """Check if the employee has the specified order in their inventory."""
-    orders_carried = state.get_employee_order_repo().get_orders_carried(employee_id)
+    orders_carried = [state.get_order(o) for o in state.get_orders_carried(employee_id)]
     return order_id in [order.id for order in orders_carried]
 
 def customer_exists(state: RestaurantState, customer_id: str) -> bool:
     """Check if a customer exists in the system."""
-    return state.get_customer_repo().get_customer(customer_id) is not None
+    return state.get_customer(customer_id) is not None
 
 def reached_customer(state: RestaurantState, employee_id: str, customer_id: str) -> bool:
     """Check if the employee has reached the customer."""
-    customer = state.get_customer_repo().get_customer(customer_id)
-    employee = state.get_employee_repo().get_employee(employee_id)
+    customer = state.get_customer(customer_id)
+    employee = state.get_employee(employee_id)
     return employee.position == customer.position
 
 def step_toward_customer(state: RestaurantState, employee_id: str, customer_id: str):
     """Move the employee toward the customer."""
-    customer = state.get_customer_repo().get_customer(customer_id)
-    employee = state.get_employee_repo().get_employee(employee_id)
+    customer = state.get_customer(customer_id)
+    employee = state.get_employee(employee_id)
     
     path = state.get_navigation_service().get_path_between_positions(employee.position, customer.position)
     
@@ -71,5 +71,5 @@ def step_toward_customer(state: RestaurantState, employee_id: str, customer_id: 
         return
     
     employee.position = path[1]
-    state.get_employee_repo().update_employee(employee)
+    state.update_employee(employee)
 

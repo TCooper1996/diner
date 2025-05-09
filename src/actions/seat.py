@@ -36,17 +36,18 @@ class SeatAction(BaseModel):
 
 # Utilities --------------------------------
 def get_or_find_customer_seat(state: RestaurantState, customer_id: str) -> Seat:
-    seat = state.get_customer_seat_repo().get_customer_seat(customer_id)
+    seat = state.get_customer_seat(customer_id)
     if seat:
-        return seat
+        return state.get_seat(seat)
+    customer = state.get_customer(customer_id)
+    seats = state.get_all_seats()
+    seat_index = state.get_navigation_service().get_closest_entity(customer.position, [s.position for s in seats])
+    state.set_customer_seat(customer_id, seats[seat_index].seat_id)
 
-    seat = state.get_customer_seat_service().find_closest_seat_to_customer(customer_id)
-    state.get_customer_seat_repo().set_customer_seat(customer_id, seat.seat_id)
-
-    return seat
+    return seats[seat_index]
 
 def step_toward_chair(state: RestaurantState, customer_id: str, seat: Seat):
-    customer = state.get_customer_repo().get_customer(customer_id)
+    customer = state.get_customer(customer_id)
     path = state.get_navigation_service().get_path_between_positions(customer.position, seat.position)
     
     if path is None or len(path) == 0 or len(path) == 1:
@@ -54,14 +55,14 @@ def step_toward_chair(state: RestaurantState, customer_id: str, seat: Seat):
 
     # Move the customer
     customer.position = path[1]
-    state.get_customer_repo().update_customer(customer)
+    state.update_customer(customer)
 
 def arrived_at_chair(state: RestaurantState, customer_id: str, seat: Seat) -> bool:
-    customer = state.get_customer_repo().get_customer(customer_id)
+    customer = state.get_customer(customer_id)
     return customer.position == seat.position
 
 def customer_exists(state: RestaurantState, customer_id: str) -> bool:
-    return state.get_customer_repo().get_customer(customer_id) is not None
+    return state.get_customer(customer_id) is not None
 
 def status(state: RestaurantState, customer_id: str) -> CustomerStatus:
-    return state.get_customer_repo().get_customer(customer_id).status
+    return state.get_customer(customer_id).status

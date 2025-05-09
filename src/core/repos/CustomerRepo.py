@@ -4,7 +4,6 @@ from typing import Protocol
 from src.core.entities.customer import Customer
 
 
-@dataclass
 class CustomerRepo(Protocol):
     def get_all_customers(self) -> list[Customer]:
         """Get all customers."""

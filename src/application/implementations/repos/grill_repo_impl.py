@@ -29,10 +29,10 @@ class GrillRepoImpl(GrillRepo):
         Raises:
             ValueError: If a grill with the same ID already exists.
         """
-        if grill.id in self._grills:
-            raise ValueError(f"Grill with ID {grill.id} already exists")
+        if grill.grill_id in self._grills:
+            raise ValueError(f"Grill with ID {grill.grill_id} already exists")
         
-        self._grills[grill.id] = grill
+        self._grills[grill.grill_id] = grill
     
     def get_grill(self, grill_id: str) -> Grill:
         """

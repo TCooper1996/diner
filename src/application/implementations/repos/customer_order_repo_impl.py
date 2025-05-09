@@ -6,64 +6,55 @@ from src.core.repos.CustomerOrderRepo import CustomerOrderRepo
 class CustomerOrderRepoImpl(CustomerOrderRepo):
     """
     Implementation of the CustomerOrderRepo protocol that stores the relationships
-    between customers and orders in dictionaries.
+    between customers and orders using a single dictionary.
     """
 
     def __init__(self):
         self._customer_orders: dict[str, str] = {}  # customer_id -> order_id
-        self._order_customers: dict[str, str] = {}  # order_id -> customer_id
-        self._orders: dict[str, Order] = {}  # Cache for order objects
-        self._customers: dict[str, Customer] = {}  # Cache for customer objects
 
-    def associate_customer_order(self, customer: Customer, order: Order) -> None:
+    def associate_customer_order(self, customer_id: str, order_id: str) -> None:
         """
         Associate a customer with an order.
         
         Args:
-            customer: The customer to associate.
-            order: The order to associate.
+            customer_id: ID of the customer to associate.
+            order_id: ID of the order to associate.
         """
-        self._customer_orders[customer.id] = order.id
-        self._order_customers[order.id] = customer.id
-        
-        # Cache the objects for faster retrieval
-        self._orders[order.id] = order
-        self._customers[customer.id] = customer
+        # Check if order is already associated with another customer
+        existing_customer = self.get_customer_of_order(order_id)
+        if existing_customer and existing_customer != customer_id:
+            raise ValueError(f"Order {order_id} is already associated with customer {existing_customer}")
+            
+        self._customer_orders[customer_id] = order_id
 
-    def get_order_of_customer(self, customer_id: str) -> Order:
+    def get_order_of_customer(self, customer_id: str) -> str:
         """
-        Get the order of a customer by their ID.
+        Get the order ID of a customer by their ID.
         
         Args:
             customer_id: The ID of the customer.
             
         Returns:
-            The order of the customer.
+            The order ID of the customer.
             
         Raises:
             KeyError: If the customer has no associated order.
         """
         order_id = self._customer_orders.get(customer_id)
-        if not order_id or order_id not in self._orders:
+        if not order_id:
             raise KeyError(f"No order found for customer with ID {customer_id}")
         
-        return self._orders[order_id]
+        return order_id
 
-    def get_customer_of_order(self, order_id: str) -> Customer:
+    def get_customer_of_order(self, order_id: str) -> str:
         """
-        Get the customer associated with a specific order ID.
+        Get the customer ID associated with a specific order ID.
         
         Args:
             order_id: The ID of the order.
             
         Returns:
-            The customer associated with the order.
-            
-        Raises:
-            KeyError: If the order is not associated with any customer.
+            The customer ID associated with the order, or None if not found.
         """
-        customer_id = self._order_customers.get(order_id)
-        if not customer_id or customer_id not in self._customers:
-            raise KeyError(f"No customer found for order with ID {order_id}")
-        
-        return self._customers[customer_id]
+        order_customers = {v: k for k, v in self._customer_orders.items()}
+        return order_customers[order_id]

@@ -14,3 +14,7 @@ class NavigationService(Protocol):
     def get_closest_entity(self, has_position: Position, entities: list[Position]) -> int:
         """Returns the index of the closest entity in the list"""
         ...
+
+    def get_floor_plan(self) -> list[Position]:
+        """Returns the floor plan of the restaurant"""
+        ...

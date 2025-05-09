@@ -1,11 +1,9 @@
 import json
-import pytest
 from src.actions import create_tools, parse_tool
 from src.actions.cook import CookAction
 from src.actions.move import MoveToNewRoom
 from src.actions.seat import SeatAction
 from src.actions.wait import WaitAction
-from src.agents.RefinementAgent import RefinementAgent
 from src.agents.models.Claude import Claude
 from src.agents.models.Llama import Llama
 from langchain_core.messages import SystemMessage, HumanMessage

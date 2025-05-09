@@ -3,9 +3,12 @@ from dataclasses import dataclass
 from typing import ClassVar, Dict, List, Literal, Tuple, TypeVar
 
 from src.common.position import Position
-from src.infrastructure.navigation.LevelViewTile import LevelViewTile
-from src.infrastructure.navigation.tiles import Tile, T
 
+T = TypeVar("T", bound=str) 
+@dataclass
+class Tile[T]:
+    tileType: T
+    pos: Position
 
 class FloorPlan[T]:
     def __init__(self, raw_data: List[str], tile_types: Dict[str, T]):
@@ -68,20 +71,6 @@ class FloorPlan[T]:
             tiles.extend(row)
         return tiles
         
-
-    def print_level(self, entities: List[Position]):
-        occupant_dict = {}
-        for pos in entities:
-            # Count the number of entities at each position
-            if pos not in occupant_dict:
-                occupant_dict[pos] = 1
-            occupant_dict[pos] += 1
-
-        grid = self.tiles
-        views = self.mapGrid(grid, lambda tile: LevelViewTile(location=tile.room, occupants = occupant_dict.get(tile.pos, 0)))
-        strings = self.mapGrid(views, lambda tile: tile.to_string())
-        return "\n".join(["".join(line) for line in strings])
-
 
     def mapGrid(self, grid: List[List[Tile]], func):
         return [[func(cell) for cell in row] for row in grid]

@@ -47,7 +47,7 @@ class MoveToNewRoom(BaseModel):
 # Utilities --------------------------------
 def get_current_location(state: RestaurantState, employee_id: str) -> str:
     """Get the current location type of the employee."""
-    employee = state.get_employee_repo().get_employee(employee_id)
+    employee = state.get_employee(employee_id)
     # This would need to be implemented to determine location based on position
     # For now just return a placeholder
     position = employee.position
@@ -68,7 +68,7 @@ def lock_station(state: RestaurantState, station_id: str, employee_id: str):
 
 def approach_entity(state: RestaurantState, employee_id: str, entity_id: str) -> bool:
     """Move employee toward an entity and return True if reached."""
-    employee = state.get_employee_repo().get_employee(employee_id)
+    employee = state.get_employee(employee_id)
     
     # This is a simplified implementation - in a real system you'd get the entity position
     # from the appropriate repository based on the entity ID and type

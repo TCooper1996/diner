@@ -6,7 +6,6 @@ from src.common.events import GameEvent, GuiEvent
 from src.tui import canvas
 from src.tui.app.game_restart_loop import game_restart_loop
 from src.tui.app.loop import loop
-from src.tui.app.window_state import WindowGameSnapshot, WindowState
 from src.tui.canvas.canvas_state import CanvasState
 from src.tui.gui.gui_state import GuiState
 from src.tui.gui.make_gui import make_gui

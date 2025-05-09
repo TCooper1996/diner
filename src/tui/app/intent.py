@@ -3,7 +3,6 @@ from typing import List
 
 from src.common.events import GameEvent
 from src.common.events.game_events import GameUpdateEvent
-from src.core.entities.info import EntityInfo
 
 
 class PauseCommand():

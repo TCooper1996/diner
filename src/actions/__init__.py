@@ -17,7 +17,6 @@ from src.actions.deliver_order_to_customer import DeliverOrderToCustomer
 from src.actions.wait import WaitAction
 from src.actions.pick_up_order import PickUpOrder
 from src.core.models.Action import Action
-from src.utils.benchmark import benchmark
 
 # List of all action tools available to the agent
 actionTypes = Literal[

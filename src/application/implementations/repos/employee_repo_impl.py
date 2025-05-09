@@ -44,7 +44,7 @@ class EmployeeRepoImpl(EmployeeRepo):
         Args:
             employee: The employee to update.
         """
-        self._employees[employee.id] = employee
+        self._employees[employee.name] = employee
     
     def add_employee(self, employee: Employee) -> None:
         """
@@ -56,7 +56,7 @@ class EmployeeRepoImpl(EmployeeRepo):
         Raises:
             ValueError: If an employee with the same ID already exists.
         """
-        if employee.id in self._employees:
-            raise ValueError(f"Employee with ID {employee.id} already exists")
+        if employee.name in self._employees:
+            raise ValueError(f"Employee with ID {employee.name} already exists")
         
-        self._employees[employee.id] = employee
+        self._employees[employee.name] = employee

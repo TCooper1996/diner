@@ -1,13 +1,12 @@
 from typing import Protocol
 
-from src.core.entities.order import Order
 
 
 class EmployeeOrderRepo(Protocol):
     """
     Relationship repo that tracks which employees have taken which orders, and what orders an employee is carrying
     """
-    def get_orders_taken(self, employee_name: str) -> list[Order]:
+    def get_orders_taken(self, employee_name: str) -> list[str]:
         """Get the orders taken by an employee"""
         ...
 
@@ -15,7 +14,7 @@ class EmployeeOrderRepo(Protocol):
         """Add an order to the orders taken by an employee"""
         ...
 
-    def get_orders_carried(self, employee_name: str) -> list[Order]:
+    def get_orders_carried(self, employee_name: str) -> list[str]:
         """Get the orders carried by an employee"""
         ...
 

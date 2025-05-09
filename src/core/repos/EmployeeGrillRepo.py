@@ -1,10 +1,8 @@
 from typing import Protocol
 
-from src.core.entities.grill import Grill
-
 
 class EmployeeGrillRepo(Protocol):
-    def get_employee_grill(self, employee_id: str) -> Grill | None:
+    def get_employee_grill(self, employee_id: str) -> str | None:
         """Get the grill assigned to an employee by their ID."""
         ...
         

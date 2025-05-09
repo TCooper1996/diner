@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Dict, List
 import pygame
 from src.common.position import FPosition, Position
-from src.core.entities.info import EntityInfo
 from src.tui.app.draw_gui import DrawGuiInput, draw_gui
 from src.tui.app.window_state import WindowState
 from src.tui.canvas import update_canvas as _update_canvas
@@ -11,14 +10,12 @@ from src.tui.gui.gui_state import GuiState, GuiTurnSummary
 from src.tui.gui.ui_manager import UIManager
 from src.tui.gui.get_gui_content import  get_gui_content
 from src.tui.gui.widget_layout import WindowLayout, compute_layout
-from src.utils.benchmark import benchmark
 asset_path = Path("/Users/taylercooper/Dev/openmoji-svg-color")
 
 """
 High level drawing function
 """
 
-@benchmark
 def update_window(widgets: UIManager, surface: pygame.Surface, state: WindowState, time_delta: float):
     width, height = surface.get_size()
     widgets.ui_manager.set_window_resolution((width, height))
@@ -32,15 +29,14 @@ def update_window(widgets: UIManager, surface: pygame.Surface, state: WindowStat
 
 
 def get_canvas_aspect_ratio(state: WindowState) -> float:
-    floors = [f.position for f in state.game_snapshot.entity_repo.floors]
+    floors = state.game_snapshot.get_navigation_service().get_floor_plan()
     width = max(f.x for f in floors) + 1
     height = max(f.y for f in floors) + 1
     return width / height
 
-@benchmark
 def update_gui(state: WindowState, layout: WindowLayout, widget_manager: UIManager, update_gui_func):
-    gui_turn_summaries = state.game_snapshot.turn_summaries
-    g_state = GuiState(state.paused, state.current_turn_num, state.max_turn, state.game_snapshot.current_entity, gui_turn_summaries )
+    gui_turn_summary = GuiTurnSummary(state.game_snapshot.get_whose_turn(), state.game_snapshot.get_turn_summary())
+    g_state = GuiState(state.paused, state.current_turn_num, state.max_turn, state.game_snapshot.whose_turn(), gui_turn_summaries )
     gui_content = get_gui_content(g_state)
 
     widgets = {

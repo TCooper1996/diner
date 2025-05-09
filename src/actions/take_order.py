@@ -34,29 +34,29 @@ class TakeOrderAction(BaseModel):
 # Utilities --------------------------------
 def customer_exists(state: RestaurantState, customer_id: str) -> bool:
     """Check if a customer exists in the system."""
-    return state.get_customer_repo().get_customer(customer_id) is not None
+    return state.get_customer(customer_id) is not None
 
 def reached_customer(state: RestaurantState, employee_name: str, customer_id: str) -> bool:
     """Check if the employee has reached the customer."""
-    customer = state.get_customer_repo().get_customer(customer_id)
-    employee = state.get_employee_repo().get_employee(employee_name)
+    customer = state.get_customer(customer_id)
+    employee = state.get_employee(employee_name)
     return employee.position == customer.position
 
 def step_toward_customer(state: RestaurantState, employee_name: str, customer_id: str):
-    customer = state.get_customer_repo().get_customer(customer_id)
-    employee = state.get_employee_repo().get_employee(employee_name)
+    customer = state.get_customer(customer_id)
+    employee = state.get_employee(employee_name)
     """Move the employee toward the customer."""
     path = state.get_navigation_service().get_path_between_positions(employee.position, customer.position)
     employee.position = path[1]
-    state.get_employee_repo().update_employee(employee)
+    state.update_employee(employee)
     
 
 def add_order(state: RestaurantState, employee_name: str, customer_id: str):
     """Creates a new order, creates employee_order record, and updates customer status."""
-    order = state.get_order_repo().create_order()
-    state.get_order_repo().add_order(order)
+    order = state.create_order()
+    state.add_order(order)
 
-    state.get_employee_order_repo().add_order_taken(employee_name, order.id)
-    customer = state.get_customer_repo().get_customer(customer_id)
+    state.add_order_taken(employee_name, order.id)
+    customer = state.get_customer(customer_id)
     customer.status = CustomerStatus.ORDERED
-    state.get_customer_repo().update_customer(customer)
+    state.update_customer(customer)

@@ -47,7 +47,7 @@ class SeatRepoImpl(SeatRepo):
         Raises:
             ValueError: If a seat with the same ID already exists.
         """
-        if seat.id in self._seats:
-            raise ValueError(f"Seat with ID {seat.id} already exists")
+        if seat.seat_id in self._seats:
+            raise ValueError(f"Seat with ID {seat.seat_id} already exists")
         
-        self._seats[seat.id] = seat
+        self._seats[seat.seat_id] = seat

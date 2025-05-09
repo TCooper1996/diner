@@ -26,8 +26,7 @@ class OrderRepoImpl(OrderRepo):
         
         order = Order(
             id=order_id,
-            food_item="",
-            status=OrderStatus.NOT_STARTED
+            status=OrderStatus.PENDING
         )
         
         self._orders[order_id] = order

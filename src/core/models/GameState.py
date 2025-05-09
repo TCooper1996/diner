@@ -1,19 +1,27 @@
-from dataclasses import dataclass
 from typing import Protocol
 
+from src.core.models.ActiveTurn import ActiveTurn
 from src.core.repos.ActionRepo import ActionRepo
 from src.core.repos.EmployeeMessageRepo import EmployeeMessageRepo
+from src.core.services.AgentService import AgentService
 from .RestaurantState import RestaurantState
 
-@dataclass
-class GameState(Protocol):
-    def get_restaurant_state(self) -> RestaurantState:
-        ...
-    def get_message_repo(self) -> EmployeeMessageRepo:
-        ...
-    def get_action_repo(self) -> ActionRepo:
-        ...
+class GameState(ActionRepo, EmployeeMessageRepo, AgentService, RestaurantState, Protocol):
     def get_tick(self) -> int:
+        ...
+
+    def get_whose_turn(self) -> ActiveTurn:
+        """
+        Get the current player's turn.
+        This is used to determine which player's turn it is in a multiplayer game.
+        """
+        ...
+
+    def set_whose_turn(self, player_id: ActiveTurn) -> None:
+        """
+        Set the current player's turn.
+        This is used to determine which player's turn it is in a multiplayer game.
+        """
         ...
 
     def copy(self) -> "GameState":

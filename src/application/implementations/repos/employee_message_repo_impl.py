@@ -1,6 +1,7 @@
 from typing import Dict, List
 
 from src.agents.models.Model import StandardMessage
+from src.core.models.EmployeeMessageBatch import EmployeeMessageBatch, EmployeeMessageBatchSet
 from src.core.repos.EmployeeMessageRepo import EmployeeMessageRepo
 
 
@@ -11,48 +12,20 @@ class EmployeeMessageRepoImpl(EmployeeMessageRepo):
     """
 
     def __init__(self):
-        self._employee_messages: Dict[str, List[StandardMessage]] = {}
-        self._action_results: List[str] = []
+        self._employee_messages: Dict[str, List[EmployeeMessageBatchSet]] = {}
 
     def get_employee_messages(self, employee_name: str) -> List[StandardMessage]:
-        """
-        Get the memory of an employee.
-        
-        Args:
-            employee_name: The name of the employee.
-            
-        Returns:
-            The list of messages for the employee, or an empty list if none exist.
-        """
-        return self._employee_messages.get(employee_name, [])
+        messages = self._employee_messages.get(employee_name, [])
+        return [m for mset in messages for batch in mset.failures + [mset.value] for m in batch.get_standard_messages()]
 
-    def add_employee_messages(self, employee_name: str, messages: List[StandardMessage]) -> None:
-        """
-        Add messages to an employee's memory.
-        
-        Args:
-            employee_name: The name of the employee.
-            messages: The messages to add.
-        """
+
+    def add_employee_messages(self, employee_name: str, messages: EmployeeMessageBatchSet) -> None:
         if employee_name not in self._employee_messages:
             self._employee_messages[employee_name] = []
         
-        self._employee_messages[employee_name].extend(messages)
+        self._employee_messages[employee_name].append(messages)
 
-    def add_action_result(self, result: str) -> None:
-        """
-        Add an action result to the repository.
-        
-        Args:
-            result: The action result to add.
-        """
-        self._action_results.append(result)
-    
-    def get_action_results(self) -> List[str]:
-        """
-        Get all action results.
-        
-        Returns:
-            The list of all action results.
-        """
-        return self._action_results.copy()
+    def get_last_message_batch(self, employee_name: str) -> EmployeeMessageBatchSet:
+        if employee_name in self._employee_messages and self._employee_messages[employee_name]:
+            return self._employee_messages[employee_name][-1]
+        raise ValueError(f"No messages found for employee: {employee_name}")

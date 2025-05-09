@@ -1,4 +1,4 @@
-from typing import Dict, List, Set
+from typing import Dict, List
 
 from src.core.entities.order import Order
 from src.core.repos.EmployeeOrderRepo import EmployeeOrderRepo
@@ -7,24 +7,18 @@ from src.core.repos.EmployeeOrderRepo import EmployeeOrderRepo
 class EmployeeOrderRepoImpl(EmployeeOrderRepo):
     """
     Implementation of the EmployeeOrderRepo protocol that stores the relationships
-    between employees and orders in dictionaries.
+    between employees and orders using dictionaries.
+    
+    Since we need to track two distinct relationships (orders taken and orders carried),
+    we still use two dictionaries but each tracks only one direction of the relationship.
     """
 
     def __init__(self):
-        self._orders_taken: Dict[str, Set[str]] = {}  # employee_name -> set of order_ids
-        self._orders_carried: Dict[str, Set[str]] = {}  # employee_name -> set of order_ids
-        self._orders: Dict[str, Order] = {}  # order_id -> Order (cache)
+        # Map of employee_name to a list of order_ids
+        self._employee_orders_taken: Dict[str, List[str]] = {}  
+        self._employee_orders_carried: Dict[str, List[str]] = {}  
 
-    def add_order(self, order: Order) -> None:
-        """
-        Add an order to the repository cache.
-        
-        Args:
-            order: The order to add.
-        """
-        self._orders[order.id] = order
-
-    def get_orders_taken(self, employee_name: str) -> list[Order]:
+    def get_orders_taken(self, employee_name: str) -> list[str]:
         """
         Get the orders taken by an employee.
         
@@ -32,10 +26,9 @@ class EmployeeOrderRepoImpl(EmployeeOrderRepo):
             employee_name: The name of the employee.
             
         Returns:
-            The list of orders taken by the employee.
+            A list of order IDs taken by the employee.
         """
-        order_ids = self._orders_taken.get(employee_name, set())
-        return [self._orders[order_id] for order_id in order_ids if order_id in self._orders]
+        return self._employee_orders_taken.get(employee_name, [])
 
     def add_order_taken(self, employee_name: str, order_id: str) -> None:
         """
@@ -44,19 +37,14 @@ class EmployeeOrderRepoImpl(EmployeeOrderRepo):
         Args:
             employee_name: The name of the employee.
             order_id: The ID of the order.
-            
-        Raises:
-            KeyError: If the order with the specified ID doesn't exist in the cache.
         """
-        if order_id not in self._orders:
-            raise KeyError(f"No order found with ID {order_id}")
+        if employee_name not in self._employee_orders_taken:
+            self._employee_orders_taken[employee_name] = []
         
-        if employee_name not in self._orders_taken:
-            self._orders_taken[employee_name] = set()
-        
-        self._orders_taken[employee_name].add(order_id)
+        if order_id not in self._employee_orders_taken[employee_name]:
+            self._employee_orders_taken[employee_name].append(order_id)
 
-    def get_orders_carried(self, employee_name: str) -> list[Order]:
+    def get_orders_carried(self, employee_name: str) -> list[str]:
         """
         Get the orders carried by an employee.
         
@@ -64,10 +52,9 @@ class EmployeeOrderRepoImpl(EmployeeOrderRepo):
             employee_name: The name of the employee.
             
         Returns:
-            The list of orders carried by the employee.
+            A list of order IDs carried by the employee.
         """
-        order_ids = self._orders_carried.get(employee_name, set())
-        return [self._orders[order_id] for order_id in order_ids if order_id in self._orders]
+        return self._employee_orders_carried.get(employee_name, [])
 
     def add_order_carried(self, employee_name: str, order_id: str) -> None:
         """
@@ -76,17 +63,12 @@ class EmployeeOrderRepoImpl(EmployeeOrderRepo):
         Args:
             employee_name: The name of the employee.
             order_id: The ID of the order.
-            
-        Raises:
-            KeyError: If the order with the specified ID doesn't exist in the cache.
         """
-        if order_id not in self._orders:
-            raise KeyError(f"No order found with ID {order_id}")
+        if employee_name not in self._employee_orders_carried:
+            self._employee_orders_carried[employee_name] = []
         
-        if employee_name not in self._orders_carried:
-            self._orders_carried[employee_name] = set()
-        
-        self._orders_carried[employee_name].add(order_id)
+        if order_id not in self._employee_orders_carried[employee_name]:
+            self._employee_orders_carried[employee_name].append(order_id)
 
     def remove_orders_carried(self, employee_name: str, order_id: str) -> None:
         """
@@ -96,5 +78,20 @@ class EmployeeOrderRepoImpl(EmployeeOrderRepo):
             employee_name: The name of the employee.
             order_id: The ID of the order.
         """
-        if employee_name in self._orders_carried and order_id in self._orders_carried[employee_name]:
-            self._orders_carried[employee_name].remove(order_id)
+        if employee_name in self._employee_orders_carried and order_id in self._employee_orders_carried[employee_name]:
+            self._employee_orders_carried[employee_name].remove(order_id)
+            
+    def get_employee_with_order(self, order_id: str) -> str | None:
+        """
+        Find which employee is carrying a specific order.
+        
+        Args:
+            order_id: The ID of the order.
+            
+        Returns:
+            The name of the employee carrying the order, or None if not found.
+        """
+        for employee_name, orders in self._employee_orders_carried.items():
+            if order_id in orders:
+                return employee_name
+        return None

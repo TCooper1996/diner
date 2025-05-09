@@ -2,8 +2,6 @@
 from time import sleep, time
 import pygame
 from src.tui.app.get_event import all_events
-from src.tui.app.process_gui_event import process_gui_event
-from src.tui.app.update_window import UpdateWindowInput, update_window
 from src.tui.app.window_state import WindowState
 from src.tui.gui.make_gui import make_gui
 from src.tui.gui.widget_layout import compute_layout

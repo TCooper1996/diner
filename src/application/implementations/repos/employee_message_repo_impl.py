@@ -12,7 +12,7 @@ class EmployeeMessageRepoImpl(EmployeeMessageRepo):
     """
 
     def __init__(self):
-        self._employee_messages: Dict[str, List[EmployeeMessageBatchSet]] = {}
+        self._employee_messages: Dict[str, List[EmployeeMessageBatch]] = {}
 
     def get_employee_messages(self, employee_name: str) -> List[StandardMessage]:
         messages = self._employee_messages.get(employee_name, [])

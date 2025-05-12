@@ -1,5 +1,8 @@
 
 from typing import List, Tuple
+from src.application.misc.prompt_from_state import to_prompt
+from src.core.models.Action import Action
+from src.core.models.ActionSelection import ActionSelection
 from src.core.models.GameState import GameState
 
 
@@ -23,5 +26,16 @@ async def handle_employee_turn(state: GameState, employee_id: str):
     state.set_employee_action(employee_id, current_action if state_result.repeat else None)
 
 # Utilities ------------------------------------------
-async def get_next_action(state: GameState, employee_id: str) -> Tuple[List[AgentServiceAttempt], PartialAgentServiceAttempt]:
-    return await state.get_next_valid_action(employee_id, to_prompt(state), state.get_employee_messages(employee_id), lambda action: action.verify(state, employee_id))
+async def get_next_action(state: GameState, employee_id: str) -> Action:
+    # Make 3 attempts to get a valid action
+    for i in range(3):
+        action_selection = await state.choose_action(
+            employee_id,
+            to_prompt(state)
+        )
+
+        action = action_selection.get_action_instance()
+        verify_result = action.verify(state, employee_id)
+        state.add_verify_action_log(action, verify_result.error_msg)
+        if verify_result.success:
+            return action_selection.get_action_instance()

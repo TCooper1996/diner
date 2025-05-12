@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from src.core.repos import *
+from src.core.repos.GameLogRepo import GameLogRepo
 from src.core.services import *
 
 
@@ -11,6 +12,6 @@ RestaurantState should only contain real world objects and relationships, no age
 """
 class RestaurantState(CustomerRepo, OrderRepo, EmployeeRepo, SeatRepo, EntranceRepo, GrillRepo,
                     CustomerSeatRepo, CustomerOrderRepo, EmployeeGrillRepo, EmployeeOrderRepo, 
-                    Protocol):
+                    GameLogRepo, Protocol):
     def get_navigation_service(self) -> NavigationService:
         ...

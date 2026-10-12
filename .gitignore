@@ -1,3 +1,4 @@
 src/**/__pycache__/*
 .env
 .vscode/*
+./node_modules/**
